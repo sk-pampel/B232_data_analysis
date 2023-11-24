@@ -1,0 +1,17 @@
+*.pyc
+*.DS_Store
+arc/build/
+*.ipynb_checkpoints/
+arc.egg-info/
+build/
+dist/
+**/__pycache__
+*_precalculated.db
+*.so
+.eggs/
+*.egg-info/
+/doc/alkali_atom_data
+/doc/divalent_atom_functions
+/doc/divalent_atom_data
+/doc/generated
+/doc/_static

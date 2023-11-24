@@ -1,0 +1,7 @@
+MOT temp = None
+PGC temp = None
+LGM temp = None
+Thermal Nbar = None
+Radial Nbar = None
+Axial Nbar = None
+Lifetime = None

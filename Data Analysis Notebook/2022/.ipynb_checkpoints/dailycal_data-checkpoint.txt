@@ -1,0 +1,7 @@
+MOT temp = [82.19346394618783, 4.9779346402907345]
+PGC temp = None
+LGM temp = [20.0, 141.95864313570337]
+Thermal Nbar = [inf, 20.843048762893826]
+Radial Nbar = None
+Axial Nbar = [1.0, inf]
+Lifetime = [0.2215913353171305, 0.8844901271963634]
