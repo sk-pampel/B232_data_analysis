@@ -438,3 +438,7 @@ def dblAsymErrString(val, err_L1, err_U1, err_L2, err_U2, precision=None):
     result = (r'$'+round_sig_str(val, precision) + '^{(' + round_sig_str(errNumU1, numU1) + ')('+round_sig_str(errNumU2, numU2)+')}' 
               + '_{(' + round_sig_str(errNumL1, numL1) + ')('+ round_sig_str(errNumL2, numL2) + ')}$')
     return result
+
+def reportProgress(num, total):
+    print( round_sig_str(num/total*100) + '%                     ',  end='\r' )
+    #IPython.display.clear_output(wait=True)

@@ -329,3 +329,8 @@ EpsilonTrap = 0
 # the third is the sigma minus polarization component.
 uTrap = [0, 1, 0]
 
+
+IsatD1 = 44.84  # I_sat for pi polarized D1 transistion W/m^2
+IsatD2 = 25.03 # I_sat for pi polarized D2 transistion W/m^2
+muD1 = 2.537e-29 # dipole transition matrix element for D1
+muD2 = 3.584e-29 # dipole transition matrix element for D2

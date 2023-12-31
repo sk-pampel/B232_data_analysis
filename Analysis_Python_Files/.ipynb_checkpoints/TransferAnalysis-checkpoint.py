@@ -67,7 +67,8 @@ def organizeTransferData( fileNumber, analysisOpts, key=None, win=pw.PictureWind
     with exp.ExpFile(fileNumber, expFile_version=expFile_version, useBase=useBase, keyParameter=keyParameter) as f:
         rawData, keyName, hdf5Key, repetitions = f.pics, f.key_name, f.key, f.reps
         if not quiet:
-            basicInfoStr = f.get_basic_info()
+            basicInfoStr = 'supress basic info'
+            # basicInfoStr = f.get_basic_info()
         if (rawData[0] == np.zeros(rawData[0].shape)).all():
             raise ValueError("Pictures in Data are all zeros?!")
         isAnn = f.isAnnotated()
@@ -329,3 +330,37 @@ def standardTransferAnalysis( fileNumber, analysisOpts, picsPerRep=2, fitModules
             fits, avgTferData, avgTferErr, avgFit, avgPics, genAvgs, genErrs, tferVarAvg, tferVarErr, initAtomImages, 
             tferAtomImages, tferPicCounts, tferThresholds, fitModules, basicInfoStr, ensembleHits, tOptions, analysisOpts,
             tferAtomsPs, tferAtomsPs, tferList, isAnnotated, condHitList)
+
+
+def getCollisionalData(fileId,loadOneOpt,loadTwoOpt,threshold = 60):
+    load_one_data = standardTransferAnalysis(fileId, loadOneOpt, tOptions = [to.ThresholdOptions(manualThreshold = True, manualThresholdValue = threshold)]);
+    (tferAtomsVarAvg, tferAtomsVarErrs, loadAtomsVarAvg, initPicCounts, keyName, key1, repetitions, initThresholds, 
+                fits, avgTferData1, avgTferErr1, avgFit, avgPics, genAvgs, genErrs, tferVarAvg, tferVarErr, initAtomImages, 
+                tferAtomImages, tferPicCounts, tferThresholds, fitModules, basicInfoStr, ensembleHits, tOptions, analysisOpts,
+                tferAtomsPs, tferAtomsPs, tferList, isAnnotated, hmm) = load_one_data
+    
+    upperbound = []
+    lowerbound = []
+    for i in np.arange(0,len(avgTferErr1)):
+        up = avgTferErr1[i][0]
+        lo = avgTferErr1[i][1]
+        upperbound.append(up)  
+        lowerbound.append(lo)
+    err1= [upperbound,lowerbound]
+    
+    load_two_data = standardTransferAnalysis(fileId, loadTwoOpt, tOptions =[to.ThresholdOptions(manualThreshold = True, manualThresholdValue = threshold)]);
+    (tferAtomsVarAvg, tferAtomsVarErrs, loadAtomsVarAvg, initPicCounts, keyName, key2, repetitions, initThresholds, 
+                fits, avgTferData2, avgTferErr2, avgFit, avgPics, genAvgs, genErrs, tferVarAvg, tferVarErr, initAtomImages, 
+                tferAtomImages, tferPicCounts, tferThresholds, fitModules, basicInfoStr, ensembleHits, tOptions, analysisOpts,
+                tferAtomsPs, tferAtomsPs, tferList, isAnnotated, hmm) = load_two_data
+    
+    upperbound = []
+    lowerbound = []
+    for i in np.arange(0,len(avgTferErr2)):
+        up = avgTferErr1[i][0]
+        lo = avgTferErr1[i][1]
+        upperbound.append(up)  
+        lowerbound.append(lo)
+    err2= [upperbound,lowerbound]
+    avg_unc_2_atom = np.mean([np.mean([up,lo]) for (up,lo) in zip(err2[0],err2[1])])
+    return key1,avgTferData1,err1,avgTferData2,err2,avg_unc_2_atom  
