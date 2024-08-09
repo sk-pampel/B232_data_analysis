@@ -27,9 +27,9 @@ from .AnalysisHelpers import (processSingleImage, orderData,
 
 from . import TransferAnalysisOptions as tao
 from . import ThresholdOptions as to
-from . import MarksConstants as mc
+from . import Constants as mc
 from . import AnalysisHelpers as ah
-from . import MarksConstants as mc 
+from . import Constants as mc 
 from . import PopulationAnalysis as pa 
 from .TimeTracker import TimeTracker
 from .fitters import LargeBeamMotExpansion, exponential_saturation
@@ -166,6 +166,7 @@ def imageTickedColorbar(f, im, ax, lim):
         
 def makeThresholdStatsImages(ax, thresholds, locs, shape, ims, lims, fig):
     thresholdList = [thresh.th for thresh in thresholds]
+    print('thresholdList',thresholdList)
     thresholdPic, lims[0][0], lims[0][1] = genAvgDiscrepancyImage(thresholdList, shape, locs)
     ims.append(ax[0].imshow(thresholdPic, cmap=cm.get_cmap('seismic_r'), vmin=lims[0][0], vmax=lims[0][1], origin='lower'))
     ax[0].set_title('Thresholds:' + str(misc.round_sig(np.mean(thresholdList))), fontsize=12)
@@ -354,8 +355,9 @@ def plotMotTemperature(data, key=None, magnification=3, showAllPics=True, temper
     ax.set_title('Measured atom cloud size over time')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Gaussian fit waist (m)')
-    ax.legend(loc='right')
-    ax2.legend(loc='lower center')
+    # ax.legend(loc='right')
+    # ax2.legend(loc='lower center')
+    fig.legend(loc='upper right', bbox_to_anchor=(.9, 1.15), fontsize = 10) 
     ax2.grid(True,color='r')
     if showAllPics:
         if 'raw' in plottedData:
@@ -1383,84 +1385,3 @@ def showPics(data, key, fitParams=None, indvColorBars=False, colorMax=-1, fancy=
     return fig
 
 
-def delta_x_par (T, omega_par, mass= 87*const.u):
-    return np.sqrt(const.k*T / (mass * omega_par**2) )
-
-def delta_x_perp (T, omega_perp, mass= 87*const.u):
-    return np.sqrt(const.k*T / (mass * omega_perp**2) )
-
-def delta_v (T, mass= 87*const.u):
-    return np.sqrt(const.k * T/ mass)
-
-def get_initial_params(T, omega_par, omega_perp, num):
-    # in here we assume that the z direction is the tweezer axis -> omega parallel
-    (xi, yi)= np.random.normal(0, delta_x_perp(T, omega_perp), 2)
-    zi= np.random.normal(0, delta_x_par(T, omega_par))
-    (vxi, vyi, vzi) = np.random.normal(0, delta_v(T), 3)
-    return (xi, yi, zi, vxi, vyi, vzi)
-
-def get_final_params(dt, xi,yi,zi, vxi, vyi, vzi):
-    g= 9.8 # m/s
-    xf = xi + vxi*dt
-    yf = yi + vyi*dt - (g * dt**2)/2
-    zf = zi + vzi*dt
-    vxf = vxi
-    vyf = vyi - g*dt
-    vzf = vzi
-
-    return (xf, yf, zf, vxf, vyf, vzf )
-
-def get_final_K_energy (xf, yf, zf, vxf, vyf, vzf, omega_par, omega_perp, mass = 87*const.u):
-    return mass/2 * (vxf**2 + vyf**2 + vzf**2) + 1/2 * mass * ( (omega_par**2 * zf**2) + omega_perp**2 * (xf**2+ yf**2))
-
-def get_initial_params(T, omega_par, omega_perp, num=1):
-    # in here we assume that the z direction is the tweezer axis -> omega parallel
-    (xi, yi)= np.random.normal(0, delta_x_perp(T, omega_perp), 2*num).reshape(num,2).T
-    zi= np.random.normal(0, delta_x_par(T, omega_par))
-    (vxi, vyi, vzi) = np.random.normal(0, delta_v(T), 3*num).reshape(num,3).T
-    return (xi, yi, zi, vxi, vyi, vzi)
-
-def get_final_params(dt, xi,yi,zi, vxi, vyi, vzi):
-    g= 9.8 # m/s
-    xf = xi + vxi*dt
-    yf = yi + vyi*dt - (g * dt**2)/2
-    zf = zi + vzi*dt
-    vxf = vxi
-    vyf = vyi - g*dt
-    vzf = vzi
-    return (xf, yf, zf, vxf, vyf, vzf )
-
-def get_final_K_energy (xf, yf, zf, vxf, vyf, vzf, omega_par, omega_perp, mass = 87*const.u):
-    return mass/2 * (vxf**2 + vyf**2 + vzf**2) + 1/2 * mass * ( (omega_par**2 * zf**2) + omega_perp**2 * (xf**2+ yf**2))
-
-
-
-def get_survival_release_capture(dts, T, initial_survival, tweezer_depth, verbose = False):
-    
-    '''
-    :params T: temperature of atoms in the trap in S.I unit
-    :params tweezer_depth: trap depth in the unit of K. The trap frequency is generated accordingly assuming NA = 0.5
-    '''
-    lambda_l= 850e-9 #m
-    waist_twz = 700e-9 #m
-    # waist_twz = 0.42*lambda_l/NA #m
-    U0_tweezer_inK = tweezer_depth
-    U0_tweezer_inJ = U0_tweezer_inK*const.k
-    omega_radial = np.sqrt(4*U0_tweezer_inJ/(mc.Rb87_M*waist_twz**2)) # in rad/s
-    omega_axial = omega_radial / (np.sqrt(2)*waist_twz*np.pi/lambda_l) # in rad/s
-    # if (verbose):
-    #     print("Trap depth in uK: ", abs(U0_tweezer_inK*1e6))
-    #     print("Trap raidal freq (kHz): ", abs(omega_radial/ (2*np.pi)/1e3))
-    #     print("Trap axial freq (kHz): ", abs(omega_axial/ (2*np.pi)/1e3))
-        
-    trajectories_per_time = 10000
-    surv_dts = []
-    for j in range(len(dts)):
-        dt = dts[j]
-        initial_params = get_initial_params(T, omega_par= omega_axial, omega_perp= omega_radial, num=trajectories_per_time)
-        final_params = get_final_params(dt, *initial_params)
-        final_K_energy = get_final_K_energy(*final_params, omega_par= omega_axial, omega_perp= omega_radial)
-        surv = (final_K_energy<np.abs(U0_tweezer_inJ)).mean()
-        surv_dts.append(surv)
-
-    return np.array(surv_dts)*initial_survival

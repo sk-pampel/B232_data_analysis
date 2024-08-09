@@ -27,9 +27,9 @@ from .AnalysisHelpers import (processSingleImage, orderData,
 
 from . import TransferAnalysisOptions as tao
 from . import ThresholdOptions as to
-from . import MarksConstants as mc
+from . import Constants as mc
 from . import AnalysisHelpers as ah
-from . import MarksConstants as mc 
+from . import Constants as mc 
 from . import PopulationAnalysis as pa 
 from .TimeTracker import TimeTracker
 from .fitters import LargeBeamMotExpansion, exponential_saturation
@@ -166,6 +166,7 @@ def imageTickedColorbar(f, im, ax, lim):
         
 def makeThresholdStatsImages(ax, thresholds, locs, shape, ims, lims, fig):
     thresholdList = [thresh.th for thresh in thresholds]
+    print('thresholdList',thresholdList)
     thresholdPic, lims[0][0], lims[0][1] = genAvgDiscrepancyImage(thresholdList, shape, locs)
     ims.append(ax[0].imshow(thresholdPic, cmap=cm.get_cmap('seismic_r'), vmin=lims[0][0], vmax=lims[0][1], origin='lower'))
     ax[0].set_title('Thresholds:' + str(misc.round_sig(np.mean(thresholdList))), fontsize=12)
@@ -354,8 +355,9 @@ def plotMotTemperature(data, key=None, magnification=3, showAllPics=True, temper
     ax.set_title('Measured atom cloud size over time')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Gaussian fit waist (m)')
-    ax.legend(loc='right')
-    ax2.legend(loc='lower center')
+    # ax.legend(loc='right')
+    # ax2.legend(loc='lower center')
+    fig.legend(loc='upper right', bbox_to_anchor=(.9, 1.15), fontsize = 10) 
     ax2.grid(True,color='r')
     if showAllPics:
         if 'raw' in plottedData:

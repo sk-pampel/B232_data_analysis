@@ -28,7 +28,7 @@ from . import TransferAnalysis as ta
 from . import TransferAnalysisOptions as tao
 from . import ThresholdOptions as to
 from . import AnalysisHelpers as ah
-from . import MarksConstants as mc 
+from . import Constants as mc 
 from . import PopulationAnalysis as pa 
 from .TimeTracker import TimeTracker
 from .fitters import LargeBeamMotExpansion, exponential_saturation

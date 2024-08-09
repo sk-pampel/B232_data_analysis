@@ -18,7 +18,7 @@ import warnings
 from uncertainties import ufloat
 from uncertainties.umath import sqrt as usqrt
 # from . import MatplotlibPlotters as mp
-from . import MarksConstants as mc
+from . import Constants as mc
 from . import Miscellaneous as misc
 from .Miscellaneous import what
 from copy import copy, deepcopy
@@ -680,7 +680,7 @@ def modFitFunc(sign, hBiasIn, vBiasIn, depthIn, *testBiases):
 #         vmax = ma
 #     return pic, vmin, vmax
 
-### updated 8/2/23 to fix indexing error in for loop when disabling load three data
+# updated 8/2/23 to fix indexing error in for loop when disabling load three data
 def genAvgDiscrepancyImage(data, shape, locs):
     """
     generates an image and determines color mins and maxes to 
@@ -688,8 +688,9 @@ def genAvgDiscrepancyImage(data, shape, locs):
     """
     me = np.mean(data)
     pic = np.ones(shape) * me 
-
+    print('locs',locs[0], locs[1])
     for i in np.arange(len(data)):
+        print('data',data,i)
         pic[locs[0], locs[1]] = data[i]
     mi = min(pic.flatten())
     ma = max(pic.flatten())

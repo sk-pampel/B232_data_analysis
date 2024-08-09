@@ -5,7 +5,7 @@ from datetime import datetime
 from . import ExpFile as exp
 from . import AnalysisHelpers as ah
 from . import Miscellaneous as misc
-from . import MarksConstants as mc
+from . import Constants as mc
 from importlib import reload
 from . import MatplotlibPlotters as mp
 from . import PictureWindow as pw
@@ -30,11 +30,11 @@ class calPoint:
 # ValueError: time data '2021:February:12:3.7' does not match format '%Y:%B:%d:%H:%M'
 def loadAllTemperatureData():
     times, temps = [], [[],[],[],[]]
-    for year_ in ['2020', '2021']:
+    for year_ in ['2024']:
         print('\n',year_)
         for month_ in ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']:
             print(month_,end=', ')
-            for d in range(1,31):
+            for d in range(20,23):
                 day_ = str(d)
                 exp.setPath(day_,month_,year_)
                 reload(ah)

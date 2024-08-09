@@ -1,3 +1,4 @@
+# data analysis code v
 from matplotlib.colors import ListedColormap
 from matplotlib import cm
 import numpy as np
@@ -5,12 +6,17 @@ import matplotlib.pyplot as plt
 import scipy.optimize as opt
 import IPython.display as disp
 
+from .fitters.Gaussian import bump3, bump, gaussian_2d
+from .fitters import LargeBeamMotExpansion 
+
 from . import Miscellaneous as misc
 from . import MatplotlibPlotters as mp
 from . import ExpFile as exp
 from . import AnalysisHelpers as ah
-from .fitters.Gaussian import bump3, bump
-from .fitters import LargeBeamMotExpansion 
+from . import TransferAnalysis_FSI as ta
+from . import PictureWindow as pw
+
+import warnings
 
 viridis = cm.get_cmap('viridis', 256)
 dark_viridis = []
@@ -22,11 +28,11 @@ for i in range(256):
     dark_viridis[-1][2] = dark_viridis[-1][2] *(bl+(1-bl)*i/255)
 dark_viridis_cmap = ListedColormap(dark_viridis)
 
-def rmHighCountPics(pics, threshold):
+def rmHighCountPics(pics, maxThreshold=7000, sumThreshold=200):
     deleteList = []
-    discardThreshold = 7000
+    numPix = len(pics[0].flatten())
     for i, p in enumerate(pics):
-        if max(p.flatten()) > discardThreshold:
+        if max(p.flatten()) > maxThreshold or sum(p.flatten())/numPix > sumThreshold:
             deleteList.append(i)
     if len(deleteList) != 0:
         print('Not using suspicious data:', deleteList)
@@ -34,52 +40,105 @@ def rmHighCountPics(pics, threshold):
         pics = np.delete(pics, index, 0)
     return pics
 
+
 def photonCounting(pics, threshold):
     pcPics = np.copy(pics)
     # digitize
     pcPics[pcPics<=threshold] = 0
     pcPics[pcPics>threshold] = 1
     # sum
-    pcPics = np.sum(pcPics,axis=0)
-    return np.array(pcPics)
+    pcPicTotal = np.sum(pcPics,axis=0)
+    return np.array(pcPicTotal), pcPics
+
+def getBgImgs(fid, incr=2,startPic=1, rmHighCounts=True):
+    if type(fid) == int:
+        with exp.ExpFile(fid) as file:
+            pics = file.get_pics()
+    else:
+        pics = fid
+    pics2 = pics[startPic::incr]
+    if rmHighCounts:
+        pics2 = rmHighCountPics(pics2, 7000)
+    avgBg = np.mean(pics2,0)
+    avgPcBg = photonCounting(pics2, 120)[0] / len(pics2)
+    return avgBg, avgPcBg
 
 
-
-def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=[None], bgPcInput=[None], shapes=[None], zeroCorrection=0, zeroCorrectionPC=0,
-                            keys = None, fitModule=bump, extraPicDictionaries=None, newAnnotation=False, onlyThisPic=None, pltVSize=5,              
-                            plotSigmas=False, plotCounts=False, manualColorRange=None, picsPerRep=1, calcTemperature = False, clearOutput = True, 
-                           dataRange = None, guessTemp = 10e-6, trackFitCenter = False, increment = 1, startPic = 0, binningParams = None, 
-                           crop = [None, None, None, None]):
-    if keys is None:
-        keys = [None for _ in fids]
+def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcInput=None, shapes=[None], zeroCorrection=0, zeroCorrectionPC=0,
+                            keys=None, fitModule=bump, extraPicDictionaries=None, newAnnotation=False, onlyThisPic=None, pltVSize=5,           
+                            plotSigmas=False, plotCounts=False, manualColorRange=None, calcTemperature=False, clearOutput=True, 
+                            dataRange=None, guessTemp=10e-6, trackFitCenter=False, picsPerRep=1, startPic=0, binningParams=None, 
+                            win=pw.PictureWindow(), transferAnalysisOpts=None, tferBinningParams=None, tferWin= pw.PictureWindow(),
+                            extraTferAnalysisArgs={}, emGainSetting=300, lastConditionIsBackGround=True, showTferAnalysisPlots=True,
+                            show2dFitsAndResiduals=True, plotFitAmps=False, indvColorRanges=False, fitF2D=gaussian_2d.f_notheta, 
+                            rmHighCounts=True, useBase=True, weightBackgroundByLoading=True, returnPics=False, returnMeans=False, forceNoAnnotation=False):
+    """
+    returnPics is false by default in order to conserve memory. The total picture arrays of lots of experiments can take up a lot of RAM and are usually unnecessary,
+    """
+    fids = [fids] if type(fids) == int else fids
+    keys = [None for _ in fids] if keys is None else keys
     sortedStackedPics = {}
+    initThresholds = [None]
+    picsForBg = []
+    bgWeights = []
+    isAnnotatedList = []
     for filenum, fid in enumerate(fids):
-        if type(fid) == int:
+        if transferAnalysisOpts is not None:
+            res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
+            (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
+             avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,condhitlist) = res
+            isAnnotatedList.append(isAnnotated)
+            # assumes that you only want to look at the first condition. 
+            for varPics in groupedPostSelectedPics: # don't remember why 0 works if false...
+                picsForBg.append(varPics[-1 if lastConditionIsBackGround else 0])
+                bgWeights.append(len(varPics[0]))
+            allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics]
+            if showTferAnalysisPlots:
+                fig, axs = plt.subplots(1,2)
+                mp.makeAvgPlts( axs[0], axs[1], avgPics, transferAnalysisOpts, ['r','g','b'] ) 
+            allFSIPics = [win.window( np.array(pics) ) for pics in allFSIPics]
+            allFSIPics = ah.softwareBinning( binningParams, allFSIPics )
+        elif type(fid) == int:
             ### For looking at either PGC imgs or FSI imgs 
-            with exp.ExpFile(fid) as f:
-                allpics = f.get_pics()[startPic::increment]
-                _, key = f.get_key()
+            with exp.ExpFile(fid) as file:
+                # I think this only makes sense if there is a specific bg pic in the rotation
+                picsForBg.append(list(file.get_pics()))
+                allFSIPics = file.get_pics()[startPic::picsPerRep]
+                _, key = file.get_key()
                 if len(np.array(key).shape) == 2:
                     key = key[:,0]
-                f.get_basic_info()
+                file.get_basic_info()
+            allFSIPics = win.window( allFSIPics )
+            allFSIPics = ah.softwareBinning( binningParams, allFSIPics )
+            allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
         else:
-            allpics = fid
-            print("Assuming input is list of all pics.")
+            ### Assumes given pics have the same start pic and increment (picsPerRep).
+            # doesn't combine well w/ transfer analysis
+            picsForBg.append(fid)
+            allFSIPics = fid[startPic::picsPerRep]
+            print("Assuming input is list of all pics, then splices to get FSI pics. Old code assumed the given were FSI pics.")
+            allFSIPics = win.window( allFSIPics )
+            allFSIPics = ah.softwareBinning( binningParams, allFSIPics )
+            allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
+        # ##############
         if keys[filenum] is not None:
             key = keys[filenum]
-       
-        ### windowing, not compatible with different shapes in each variation
-        allpics = ah.windowImage(allpics, crop)
-                        
-        allpics = ah.softwareBinning(binningParams, allpics)
-        allpics = np.reshape(allpics, (len(key), int(allpics.shape[0]/len(key)), allpics.shape[1], allpics.shape[2]))    
         for i, keyV in enumerate(key):
             keyV = misc.round_sig_str(keyV)
-            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allpics[i],axis=0) if (keyV in sortedStackedPics) else allpics[i]
-    bgInput = ah.windowImage(bgInput, crop)
-    bgPcInput = ah.windowImage(bgPcInput, crop)
-    bgInput = ah.softwareBinning(binningParams, bgInput)
-    bgPcInput = ah.softwareBinning(binningParams, bgPcInput)
+            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i]         
+    if lastConditionIsBackGround:
+        bgInput, pcBgInput = getBgImgs(picsForBg, startPic = startPic, picsPerRep = picsPerRep, rmHighCounts=rmHighCounts, bgWeights=bgWeights, 
+                                       weightBackgrounds=weightBackgroundByLoading)
+    elif bgInput == 'lastPic':
+        bgInput, pcBgInput = getBgImgs(picsForBg, startPic = picsPerRep-1, picsPerRep = picsPerRep, rmHighCounts=rmHighCounts, bgWeights=bgWeights,
+                                       weightBackgrounds=weightBackgroundByLoading )
+    if bgInput is not None: # was broken and not working if not given bg
+        bgInput = win.window(bgInput)
+        bgInput = ah.softwareBinning(binningParams, bgInput)
+    if bgPcInput is not None:
+        bgPcInput = win.window(bgPcInput)
+        bgPcInput = ah.softwareBinning(binningParams, bgPcInput)   
+    
     if extraPicDictionaries is not None:
         if type(extraPicDictionaries) == dict:
             extraPicDictionaries = [extraPicDictionaries]
@@ -87,70 +146,62 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=[None], bgPc
             for keyV, pics in dictionary.items():
                 sortedStackedPics[keyV] = (np.append(sortedStackedPics[keyV], pics,axis=0) if keyV in sortedStackedPics else pics)    
     sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
-    sortedKey = list(sorted(sortedStackedKeyFl))
-    print(sortedStackedKeyFl)
-    sortedKey, sortedStackedPics = ah.applyDataRange(dataRange, sortedStackedPics, sortedKey)
+    sortedKey, sortedStackedPics = ah.applyDataRange(dataRange, sortedStackedPics, list(sorted(sortedStackedKeyFl)))
     numVars = len(sortedStackedPics.items())
     if len(np.array(shapes).shape) == 1:
         shapes = [shapes for _ in range(numVars)]       
     if guesses is None:
         guesses = [[None for _ in range(4)] for _ in range(numVars)]
-    if len(np.array(bgInput).shape) == 2:
+    if len(np.array(bgInput).shape) == 2 or bgInput == None:
         bgInput = [bgInput for _ in range(numVars)]
-    if len(np.array(bgPcInput).shape) == 2:
+    if len(np.array(bgPcInput).shape) == 2 or bgPcInput == None:
         bgPcInput = [bgPcInput for _ in range(numVars)]
-   
-    datalen, avgFitSigmas, images, fitParams, fitCovs = [{} for _ in range(5)]
+    
+    datalen, avgFitSigmas, images, hFitParams, hFitErrs, vFitParams, vFitErrs, fitParams2D, fitErrs2D = [{} for _ in range(9)]
     titles = ['Bare', 'Photon-Count', 'Bare-mbg', 'Photon-Count-mbg']
+    assert(len(sortedKey)>0)
     for vari, keyV in enumerate(sortedKey):
         keyV=misc.round_sig_str(keyV)
+        if vari==0:
+            initKeyv = keyV
         varPics = sortedStackedPics[keyV]
         # 0 is init atom pics for post-selection on atom number... if we wanted to.
-        expansionPics = rmHighCountPics(varPics[picsPerRep-1::picsPerRep],7000)
+        expansionPics = rmHighCountPics(varPics,7000) if rmHighCounts else varPics
         datalen[keyV] = len(expansionPics)
-        expPhotonCountImage = photonCounting(expansionPics, 120) / len(expansionPics)
-        if bgPcInput[vari] is None:
-            bgPhotonCountImage = np.zeros(expansionPics[0].shape)
-        else:
-            bgPhotonCountImage = bgPcInput[vari]
+        expPhotonCountImage = photonCounting(expansionPics, 120)[0] / len(expansionPics)
+        bgPhotonCountImage = np.zeros(expansionPics[0].shape) if bgPcInput[vari] is None else bgPcInput[vari]
         expAvg = np.mean(expansionPics, 0)
-        if len(bgInput[vari]) == 1:
-            bgAvg = np.zeros(expansionPics[0].shape)
-        else:
-            bgAvg = bgInput[vari]
+        bgAvg = np.zeros(expansionPics[0].shape) if (bgInput[vari] is None or len(bgInput[vari]) == 1) else bgInput[vari]
+        
         if bgPhotonCountImage is None:
             print('no bg photon', expAvg.shape)
             bgPhotonCount = np.zeros(photonCountImage.shape)
-        
-        
-        ### windowing for background...windowing images earlier 
-        #avg_mbg = ah.windowImage(expAvg, s_) - ah.windowImage(bgAvg, s_)
-        #avg_mbgpc = ah.windowImage(expPhotonCountImage, s_) - ah.windowImage(bgPhotonCountImage, s_)
-        #images[keyV] = [ah.windowImage(expAvg, s_), ah.windowImage(expPhotonCountImage, s_), avg_mbg, avg_mbgpc]
         avg_mbg = expAvg - bgAvg
         avg_mbgpc = expPhotonCountImage - bgPhotonCountImage
         images[keyV] = [expAvg, expPhotonCountImage, avg_mbg, avg_mbgpc]
-        fitParams[keyV], fitCovs[keyV] = [[] for _ in range(2)]
-        for im, guess in zip(images[keyV], guesses[vari]):
-            hAvg, vAvg = ah.collapseImage(im)
+        hFitParams[keyV], hFitErrs[keyV], vFitParams[keyV], vFitErrs[keyV], fitParams2D[keyV], fitErrs2D[keyV] = [[] for _ in range(6)]
+        for imnum, (im, guess) in enumerate(zip(images[keyV], guesses[vari])):
             if fit:
-                x = np.arange(len(hAvg))
-                if guess is None:
-                    guess = fitModule.guess(x, hAvg)
-                try:
-                    params, cov = opt.curve_fit(fitModule.f, x, hAvg, p0=guess)
-                except RuntimeError:
-                    print('fit failed!')
-                    params = guess
-                    cov = np.zeros((len(guess), len(guess)))
-                fitParams[keyV].append(params)
-                fitCovs[keyV].append(cov)
-
+                # fancy guess_x and guess_y values use the initial fitted value, typically short time, as a guess.
+                _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(
+                    im, guessSigma_x=5, guessSigma_y=5, showFit=False, 
+                    guess_x=None if vari==0 else fitParams2D[initKeyv][imnum][1], guess_y=None if vari==0 else fitParams2D[initKeyv][imnum][2],
+                    fitF=fitF2D)
+                fitParams2D[keyV].append(pictureFitParams2d)
+                fitErrs2D[keyV].append(pictureFitErrors2d)
+                hFitParams[keyV].append(h_params)
+                hFitErrs[keyV].append(h_errs)
+                vFitParams[keyV].append(v_params)
+                vFitErrs[keyV].append(v_errs)
+    # conversion from the num of pixels on the camera to microns at the focus of the tweezers
     cf = 16e-6/64
     mins, maxes = [[], []]
     imgs_ = np.array(list(images.values()))
     for imgInc in range(4):
-        if manualColorRange is None:
+        if indvColorRanges:
+            mins.append(None)
+            maxes.append(None)
+        elif manualColorRange is None:
             mins.append(min(imgs_[:,imgInc].flatten()))
             maxes.append(max(imgs_[:,imgInc].flatten()))
         else:
@@ -159,114 +210,126 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=[None], bgPc
     numVariations = len(images)
     if onlyThisPic is None:
         fig, axs = plt.subplots(numVariations, 4, figsize=(20, pltVSize*numVariations))
-        
         if numVariations == 1:
             axs = np.array([axs])
-        
+        bgFig, bgAxs = plt.subplots(1, 2, figsize=(20, pltVSize))
     else:
-        numRows = int(np.ceil(numVariations/4))
-
-        if numVariations == 1:
-            fig, axs = plt.subplots(figsize=(20, pltVSize))
-            axs = np.array(axs)
-        else:
-            fig, axs = plt.subplots(numRows, 4, figsize=(20, pltVSize*numRows))
-    #if numVariations == 1:
-     #   axs = [axs]
-    
-    fitCenters = np.zeros((len(images), 4))
-    fitCenterErrs = np.zeros((len(images), 4))
-    sigmas = np.zeros((len(images), 4))
-    totalSignal = np.zeros((len(images), 4))
-    sigmaErrs = np.zeros((len(images), 4))
+        numRows = int(np.ceil((numVariations+3)/4))
+        fig, axs = plt.subplots(numRows, 4 if numVariations>1 else 3, figsize=(20, pltVSize*numRows))
+        avgPicAx = axs.flatten()[-3]
+        avgPicFig = fig
+        bgAxs = [axs.flatten()[-1], axs.flatten()[-2]]
+        bgFig = fig
+    if show2dFitsAndResiduals:
+        fig2d, axs2d = plt.subplots(*((2,numVariations) if numVariations>1 else (1,2)))
     keyPlt = np.zeros(len(images))
-    amplitude = np.zeros((len(images), 4))
-    ampErrs = np.zeros((len(images), 4))
-    for vari, ((keyV,ims), (_,param_set), (_, cov_set)) in enumerate(zip(images.items(), fitParams.items(), fitCovs.items())):
-        if onlyThisPic is None:
-            for which, (im, ax, params, title, min_, max_, covs) in enumerate(zip(ims, axs[vari], param_set, titles, mins, maxes, cov_set)):
-                #for ax in axs[vari]
-                fitCenters[vari][which] = params[1]
-                fitCenterErrs[vari][which] = np.sqrt(np.diag(covs))[1]
-                sigmas[vari][which] = params[2]*cf*1e6
-                sigmaErrs[vari][which] = np.sqrt(np.diag(covs))[2]*cf*1e6
-                amplitude[vari][which] = params[0]
-                ampErrs[vari][which] = np.sqrt(np.diag(covs))[0]
-                totalSignal[vari][which] = np.sum(im.flatten())
-                keyPlt[vari] = keyV
-                res = mp.fancyImshow(fig, ax, im, imageArgs={'cmap':dark_viridis_cmap, 'vmin':min_, 'vmax':max_}, hFitParams=params, fitModule=fitModule,
-                                     flipVAx = True)
-                ax, hAvg, vAvg = [res[0], res[4], res[5]]
-                ax.set_title(keyV + ': ' + str(datalen[keyV]) + ';\n' + title + ': ' + misc.errString(sigmas[vari][which],sigmaErrs[vari][which]) 
-                    + r'$\mu m$ sigma, ' + misc.round_sig_str(totalSignal[vari][which],5), fontsize=12)
-            fig.subplots_adjust(left=0,right=1,bottom=0.1,top=0.7, wspace=0.4, hspace=0.5)
-        else:
-            ax = axs.flatten()[vari]
-            fitCenters[vari][onlyThisPic] = param_set[onlyThisPic][1]
-            fitCenterErrs[vari][onlyThisPic] = np.sqrt(np.diag(cov_set[onlyThisPic]))[1]
-            sigmas[vari][onlyThisPic] = param_set[onlyThisPic][2]*cf*1e6
-            sigmaErrs[vari][onlyThisPic] = np.sqrt(np.diag(cov_set[onlyThisPic]))[2]*cf*1e6
-            amplitude[vari][onlyThisPic] = param_set[onlyThisPic][0]
-            ampErrs[vari][onlyThisPic] = np.sqrt(np.diag(cov_set[onlyThisPic]))[0]
-            totalSignal[vari][onlyThisPic] = np.sum(ims[onlyThisPic].flatten())
-            keyPlt[vari] = keyV
-            res = mp.fancyImshow(fig, ax, ims[onlyThisPic], imageArgs={'cmap':dark_viridis_cmap, 'vmin':mins[onlyThisPic], 
-                                                                       'vmax':maxes[onlyThisPic]}, 
-                                 hFitParams=param_set[onlyThisPic], fitModule=fitModule, flipVAx = True)
-            ax, hAvg, vAvg = [res[0], res[4], res[5]]
-            ax.set_title(keyV + ': ' + str(datalen[keyV]) + ';\n' 
-                         + titles[onlyThisPic] + ': ' + misc.errString(param_set[onlyThisPic][2]*cf*1e6, np.sqrt(np.diag(cov_set[onlyThisPic]))[2]*cf*1e6) 
-                         + r'$\mu m$ sigma, ' + misc.round_sig_str((totalSignal[vari][onlyThisPic]),5), 
-                         fontsize=12)
-            fig.subplots_adjust(left=0,right=1,bottom=0.1,top=0.9, wspace=0.3, hspace=0.5)
-        
-    disp.display(fig)
+    (totalSignal, hfitCenter, hFitCenterErrs, hSigmas, hSigmaErrs, h_amp, hAmpErrs, vfitCenter, vFitCenterErrs, vSigmas, vSigmaErrs, v_amp, 
+     vAmpErrs, hSigma2D, hSigma2dErr, vSigma2D, vSigma2dErr) = [np.zeros((len(images), 4)) for _ in range(17)]
     
+    for vari, ((keyV,ims), hParamSet, hErr_set, vParamSet, vErr_set, paramSet2D, errSet2D) in enumerate(zip(
+                images.items(), *[dic.values() for dic in [hFitParams, hFitErrs, vFitParams, vFitErrs, fitParams2D, fitErrs2D]])):
+        for which in range(4):
+            if onlyThisPic is None:
+                (im, ax, title, min_, max_, hparams, hErrs, vparams, vErrs, param2d, err2d
+                 ) = [obj[which] for obj in (ims, axs[vari], titles, mins, maxes, hParamSet, hErr_set, vParamSet, vErr_set, paramSet2D, errSet2D)] 
+            else:
+                which = onlyThisPic
+                ax = axs.flatten()[vari]
+                (im, title, min_, max_, hparams, hErrs, vparams, vErrs, param2d, err2d
+                ) = [obj[which] for obj in (ims, titles, mins, maxes, hParamSet, hErr_set, vParamSet, vErr_set, paramSet2D, errSet2D)] 
+            h_amp[vari][which], hfitCenter[vari][which], hSigmas[vari][which] = hparams[0], hparams[1], hparams[2]*cf*1e6
+            hAmpErrs[vari][which], hFitCenterErrs[vari][which], hSigmaErrs[vari][which] = hErrs[0], hErrs[1], hErrs[2]*cf*1e6
+            v_amp[vari][which], vfitCenter[vari][which], vSigmas[vari][which] = vparams[0], vparams[1], vparams[2]*cf*1e6
+            vAmpErrs[vari][which], vFitCenterErrs[vari][which], vSigmaErrs[vari][which] = vErrs[0], vErrs[1], vErrs[2]*cf*1e6
+            hSigma2D[vari][which], hSigma2dErr[vari][which], vSigma2D[vari][which], vSigma2dErr[vari][which] = [
+                                            val*cf*1e6 for val in [param2d[-3], err2d[-3], param2d[-2], err2d[-2]]]
+            
+            totalSignal[vari][which] = np.sum(im.flatten())
+            keyPlt[vari] = keyV
+            res = mp.fancyImshow(fig, ax, im, imageArgs={'cmap':dark_viridis_cmap, 'vmin':min_, 'vmax':max_}, 
+                                 hFitParams=hparams, vFitParams=vparams, fitModule=fitModule, flipVAx = True, fitParams2D=param2d)
+            ax.set_title(keyV + ': ' + str(datalen[keyV]) + ';\n' + title + ': ' + misc.errString(hSigmas[vari][which],hSigmaErrs[vari][which]) 
+                + r'$\mu m$ sigma, ' + misc.round_sig_str(totalSignal[vari][which],5), fontsize=12)            
+            if show2dFitsAndResiduals:
+                X, Y = np.meshgrid(np.arange(len(im[0])), np.arange(len(im)))
+                data_fitted = fitF2D((X,Y), *param2d)
+                fitProper = data_fitted.reshape(im.shape[0],im.shape[1])
+                ax1 = axs2d[0] if numVariations == 1 else axs2d[0,vari]
+                ax2 = axs2d[1] if numVariations == 1 else axs2d[1,vari]
+                imr = ax1.imshow(fitProper, vmin=min_, vmax=max_)
+                mp.addAxColorbar(fig2d, ax1, imr)
+                ax1.contour(np.arange(len(im[0])), np.arange(len(im)), fitProper, 4, colors='w', alpha=0.2)
+                imr = ax2.imshow(fitProper-im)
+                mp.addAxColorbar(fig2d, ax2, imr)
+                ax2.contour(np.arange(len(im[0])), np.arange(len(im)), fitProper, 4, colors='w', alpha=0.2)
+            if onlyThisPic is not None:
+                break
+    
+    mp.fancyImshow(avgPicFig, avgPicAx, np.mean([img[onlyThisPic] for img in images.values()],axis=0), imageArgs={'cmap':dark_viridis_cmap},flipVAx = True)
+    avgPicAx.set_title('Average Over Variations')
+    ### Plotting background and photon counted background
+    mp.fancyImshow(bgFig, bgAxs[0], bgAvg, imageArgs={'cmap':dark_viridis_cmap},flipVAx = True) 
+    bgAxs[0].set_title('Background image (' + str(len(picsForBg)/picsPerRep) + ')')
+    mp.fancyImshow(bgFig, bgAxs[1], bgPhotonCountImage, imageArgs={'cmap':dark_viridis_cmap},flipVAx = True) 
+    bgAxs[1].set_title('Photon counted background image (' + str(len(picsForBg)/picsPerRep) + ')')
+    fig.subplots_adjust(left=0,right=1,bottom=0.1, hspace=0.2, **({'top': 0.7, 'wspace': 0.4} if (onlyThisPic is None) else {'top': 0.9, 'wspace': 0.3}))
+    
+    disp.display(fig)
+    temps, tempErrs, tempFitVs,  = [],[],[]
     if calcTemperature: 
-        mbgSigmas = np.array([elt[2] for elt in sigmas])
-        mbgSigmaErrs = np.array([elt[2] for elt in sigmaErrs])
-        myGuess = [0.0, min((mbgSigmas)*1e-6), guessTemp]
-        temp, fitV, cov = ah.calcBallisticTemperature(keyPlt*1e-3, (mbgSigmas)*1e-6, guess = myGuess, sizeErrors = mbgSigmaErrs)
-        
-        error = np.sqrt(np.diag(cov))
-        
+        for sigmas, sigmaerrs in zip([hSigmas, vSigmas, hSigma2D, vSigma2D],[hSigmaErrs, vSigmaErrs, hSigma2dErr, vSigma2dErr]):
+            mbgSigmas = np.array([elt[2] for elt in sigmas])
+            mbgSigmaErrs = np.array([elt[2] for elt in sigmaerrs])
+            myGuess = [0.0, min((mbgSigmas)*1e-6), guessTemp]
+            temp, fitV, cov = ah.calcBallisticTemperature(keyPlt*1e-3, (mbgSigmas)*1e-6, guess = myGuess, sizeErrors = mbgSigmaErrs)
+            error = np.sqrt(np.diag(cov))
+            temps.append(temp)
+            tempErrs.append(error[2])
+            tempFitVs.append(fitV)
     numAxisCol = int(plotSigmas) + int(plotCounts) + int(trackFitCenter)
-               
     if numAxisCol != 0:
         fig2, axs = plt.subplots(1, numAxisCol, figsize = (15, 5)) 
         fig2.subplots_adjust(top=0.75, wspace = 0.4)
+    colors = ['b','k','c','purple']
     if plotSigmas:
-        ax = (axs if numAxisCol == 1 else axs[0])
-        
+        ax = (axs if numAxisCol == 1 else axs[0])        
+        stdStyle = dict(marker='o',linestyle='',capsize=3)
         if onlyThisPic is not None:
-            ax.errorbar(keyPlt, sigmas[:,onlyThisPic], sigmaErrs[:,onlyThisPic], marker='o', linestyle='', capsize=3, label=titles[onlyThisPic]);
+            ax.errorbar(keyPlt, hSigmas[:,onlyThisPic], hSigmaErrs[:,onlyThisPic], color=colors[0], label='h '+titles[onlyThisPic], **stdStyle);
+            ax.errorbar(keyPlt, hSigma2D[:,onlyThisPic], hSigma2dErr[:,onlyThisPic], color=colors[1], label='2dh '+titles[onlyThisPic], **stdStyle);
+            ax.errorbar(keyPlt, vSigmas[:,onlyThisPic], vSigmaErrs[:,onlyThisPic], color=colors[2], label='v '+titles[onlyThisPic], **stdStyle);
+            ax.errorbar(keyPlt, vSigma2D[:,onlyThisPic], vSigma2dErr[:,onlyThisPic], color=colors[3], label='2dv '+titles[onlyThisPic], **stdStyle);
         else:
             for whichPic in range(4):
-                ax.errorbar(keyPlt, sigmas[:,whichPic], sigmaErrs[:,whichPic], marker='o', linestyle='', capsize=3, label=titles[whichPic]);
-        fig2.legend()
+                ax.errorbar(keyPlt, hSigmas[:,whichPic], hSigmaErrs[:,whichPic], color='b', label='h '+titles[whichPic], **stdStyle);
+                ax.errorbar(keyPlt, vSigmas[:,whichPic], vSigmaErrs[:,whichPic], color='c', label='v '+titles[whichPic], **stdStyle);
+        ax.set_ylim(max(0,ax.get_ylim()[0]),min([ax.get_ylim()[1],5]))
         ax.set_ylabel(r'Fit Sigma ($\mu m$)')
-        
-    
-        if calcTemperature:
-            # converting time to s, sigmas in um 
-            xPoints = np.linspace(min(keyPlt), max(keyPlt))*1e-3
-            yPoints = LargeBeamMotExpansion.f(xPoints, *fitV)*1e6
-            yGuess = LargeBeamMotExpansion.f(xPoints, *myGuess)*1e6
-            ax.plot(xPoints*1e3, yGuess, label = 'guess')
-            ax.plot(xPoints*1e3, yPoints, label = 'fit')
-            ax.legend()
             
+        if calcTemperature:
+            # converting time to s, hSigmas in um 
+            xPoints = np.linspace(min(keyPlt), max(keyPlt))*1e-3
+            for num, fitV in enumerate(tempFitVs):
+                #ax.plot(xPoints*1e3, LargeBeamMotExpansion.f(xPoints, *myGuess)*1e6, label = 'guess')
+                ax.plot(xPoints*1e3, LargeBeamMotExpansion.f(xPoints, *fitV)*1e6, color=colors[num])
+        ax.legend(prop={'size': 12}, markerscale=1)
+
+    if plotFitAmps: 
+        ax = (axs if numAxisCol == 1 else axs[0])
         ampAx = ax.twinx()
-        
+
         if onlyThisPic is not None:
-            ampAx.errorbar(keyPlt, amplitude[:,onlyThisPic], ampErrs[:,onlyThisPic], marker='o', linestyle='', capsize=3, 
-                           label=titles[onlyThisPic], color = 'r');
+            ampAx.errorbar(keyPlt, h_amp[:,onlyThisPic], hAmpErrs[:,onlyThisPic], label='h '+titles[onlyThisPic], color = 'orange', **stdStyle);
+            ampAx.errorbar(keyPlt, v_amp[:,onlyThisPic], vAmpErrs[:,onlyThisPic], label='v '+titles[onlyThisPic], color = 'r', **stdStyle);
         else:
             for whichPic in range(4):
-                ampAx.errorbar(keyPlt, amplitude[:,whichPic], ampErrs[:,whichPic], marker='o', linestyle='', capsize=3, label=titles[whichPic], color = 'r');
-        ampAx.set_ylabel(r'Fit amplitudes', color = 'r')
+                ampAx.errorbar(keyPlt, h_amp[:,whichPic], hAmpErrs[:,whichPic], label='h '+titles[whichPic], color = 'orange', **stdStyle);
+                ampAx.errorbar(keyPlt, v_amp[:,whichPic], vAmpErrs[:,whichPic], label='v '+titles[whichPic], color = 'r', **stdStyle);
+        [tick.set_color('red') for tick in ampAx.yaxis.get_ticklines()]
+        [tick.set_color('red') for tick in ampAx.yaxis.get_ticklabels()]
+        ampAx.set_ylabel(r'Fit h_amps', color = 'r')
         
-    totalPhotons = None    
+    hTotalPhotons, vTotalPhotons = None, None
     if plotCounts:
         # numAxCol = 1: ax = axs
         # numAxCol = 2: plotSigmas + plotCounts -- ax = axs[1]
@@ -278,99 +341,77 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=[None], bgPc
             ax = axs[1 if plotSigmas else 0]
         else:
             ax = axs[1]
-       
-        
-        #Create axis to plot photon counts
+        # Create axis to plot photon counts
         ax.set_ylabel(r'Integrated signal')
         photon_axis = ax.twinx()
-           
-        colors = ['red', 'orange', 'yellow', 'pink']
-        
+        # This is not currently doing any correct for e.g. the loading rate.
+        countToCameraPhotonEM = 0.018577 / (emGainSetting/200) # the float is is EM200. 
+        countToScatteredPhotonEM = 0.018577 / 0.07 / (emGainSetting/200)
+
         if onlyThisPic is not None:
-            #calculate number of photons
-            amp = amplitude[:,onlyThisPic]*len(expansionPics[0][0]) #Horizontal "un"normalization for number of columns begin averaged.
-            sig = sigmas[:,onlyThisPic]/(16/40) #Convert from um to pixels.
-            countToCameraPhotonEM200 = 0.018577 * 2 #(EM100)
-            countToScatteredPhotonEM200 = 0.018577/0.07 * 2
-            totalCountsPerPic = bump.area_under(amp, sig)
-            totalPhotons = countToScatteredPhotonEM200*totalCountsPerPic
-            
+            # calculate number of photons
+            hamp = h_amp[:,onlyThisPic]*len(expansionPics[0][0]) # Horizontal "un"normalization for number of columns begin averaged.
+            vamp = v_amp[:,onlyThisPic]*len(expansionPics[0]) 
+            hsigpx = hSigmas[:,onlyThisPic]/(16/64) # Convert from um back to to pixels.
+            vsigpx = vSigmas[:,onlyThisPic]/(16/64)
+            htotalCountsPerPic = bump.area_under(hamp, hsigpx)
+            vtotalCountsPerPic = bump.area_under(vamp, vsigpx)
+            hTotalPhotons = countToScatteredPhotonEM*htotalCountsPerPic
+            vTotalPhotons = countToScatteredPhotonEM*vtotalCountsPerPic
             ax.plot(keyPlt, totalSignal[:,onlyThisPic], marker='o', linestyle='', label=titles[onlyThisPic]);
-            photon_axis.plot(keyPlt, totalPhotons, marker='o', linestyle='', color = 'r')
-            
+            photon_axis.plot(keyPlt, hTotalPhotons, marker='o', linestyle='', color = 'r', label='Horizontal')
+            photon_axis.plot(keyPlt, vTotalPhotons, marker='o', linestyle='', color = 'orange', label='Vertical')
         else:
             for whichPic in range(4):
-                #calculate number of photons
-                amp = amplitude[:,whichPic]*len(expansionPics[0][0]) #Horizontal "un"normalization for number of columns begin averaged.
-                sig = sigmas[:,whichPic]/(16/40) #Convert from um to pixels.
-                countToCameraPhotonEM200 = 0.018577 * 2 #(EM100)
-                countToScatteredPhotonEM200 = 0.018577/0.07 * 2
+                # See above comments
+                amp = h_amp[:,whichPic]*len(expansionPics[0][0]) 
+                sig = hSigmas[:,whichPic]/(16/64) 
                 totalCountsPerPic = bump.area_under(amp, sig)
-                totalPhotons = countToScatteredPhotonEM200*totalCountsPerPic
-                
+                hTotalPhotons = countToScatteredPhotonEM*totalCountsPerPic
                 ax.plot(keyPlt, totalSignal[:,whichPic], marker='o', linestyle='', label=titles[whichPic]);
-                photon_axis.plot(keyPlt, totalPhotons, marker='o', linestyle='', color = colors[whichPic])
-               
-                ax.legend()
-                photon_axis.legend()
-        
-        
-        
-        photon_axis.set_ylabel(r'Photon count', color = 'r')
-        
+                photon_axis.plot(keyPlt, hTotalPhotons, marker='o', linestyle='', color = ['red', 'orange', 'yellow', 'pink'][whichPic])               
+        ax.legend(prop={'size': 12}, markerscale=1)
+        photon_axis.legend(prop={'size': 12}, markerscale=1)
+        [tick.set_color('red') for tick in photon_axis.yaxis.get_ticklines()]
+        [tick.set_color('red') for tick in photon_axis.yaxis.get_ticklabels()]
+        photon_axis.set_ylabel(r'Fit-Based Avg Scattered Photon/Img', color = 'r',fontsize = 12)
     if trackFitCenter:
         #numaxcol = 1: ax = axs
-        #numaxcol = 2: trackfitcenter + plotsigmas: ax = axs[1]
+        #numaxcol = 2: trackfitcenter + plothSigmas: ax = axs[1]
         #numaxcol = 2: trackfitcenter + plotCounts: ax = axs[1]
         #numaxcol = 3: ax = axs[2]
-        if numAxisCol == 1:
-            ax = axs
-        else:
-            ax = axs[-1]     
-        
-        
+        ax = (axs if numAxisCol == 1 else axs[-1])
         if onlyThisPic is not None:
-            ax.errorbar(keyPlt, fitCenters[:,onlyThisPic], fitCenterErrs[:,onlyThisPic], marker='o', linestyle='', capsize=3, label=titles[onlyThisPic]);
-            def accel(t, x0, a):
-                return x0 + 0.5*a*t**2
-            
-            accelFit, AccelCov = opt.curve_fit(accel, keyPlt*1e-3, fitCenters[:,onlyThisPic], sigma = fitCenterErrs[:,onlyThisPic])
-            
-            fitx = np.linspace(keyPlt[0], keyPlt[-1])*1e-3
-            fity = accel(fitx, *accelFit)
-            
-            ax.plot(fitx*1e3, fity)
-            
-        
-        
+            #ax.errorbar(keyPlt, hfitCenter[:,onlyThisPic], hFitCenterErrs[:,onlyThisPic], marker='o', linestyle='', capsize=3, label=titles[onlyThisPic]);
+            ax.errorbar(keyPlt, vfitCenter[:,onlyThisPic], vFitCenterErrs[:,onlyThisPic], marker='o', linestyle='', capsize=3, label=titles[onlyThisPic]);
+            #def accel(t, x0, a):
+            #    return x0 + 0.5*a*t**2
+            #accelFit, AccelCov = opt.curve_fit(accel, keyPlt*1e-3, hfitCenter[:,onlyThisPic], sigma = hFitCenterErrs[:,onlyThisPic])
+            #fitx = np.linspace(keyPlt[0], keyPlt[-1])*1e-3
+            #fity = accel(fitx, *accelFit)
+            #ax.plot(fitx*1e3, fity)
         else:
             for whichPic in range(4):
-                ax.errorbar(keyPlt, fitCenters[:,whichPic], fitCenterErrs[:,whichPic], marker='o', linestyle='', capsize=3, label=titles[whichPic]);
-        
-        accelErr = np.sqrt(np.diag(AccelCov))
-        
+                ax.errorbar(keyPlt, hfitCenter[:,whichPic], hFitCenterErrs[:,whichPic], marker='o', linestyle='', capsize=3, label=titles[whichPic]);
+        #accelErr = np.sqrt(np.diag(AccelCov))
         fig2.legend()
-        ax.set_ylabel(b'Fit Centers (pix)')
+        ax.set_ylabel(r'Fit Centers (pix)')
         ax.set_xlabel('time (ms)')
        
     if numAxisCol != 0:
         disp.display(fig2) 
     
-    for fid in fids:
-        if type(fid) == int:
-            if newAnnotation or not exp.checkAnnotation(fid, force=False, quiet=True):
-                exp.annotate(fid)
+    if not forceNoAnnotation:
+        for fid, isAnnotated in zip(fids, isAnnotatedList):
+            if not isAnnotated:
+                if type(fid) == int or type(fid) == type(''):
+                    if newAnnotation or not exp.checkAnnotation(fid, force=False, quiet=True, useBase=useBase):
+                        exp.annotate(fid, useBase=useBase)
     if clearOutput:
         disp.clear_output()
-    
     if calcTemperature: 
-        tempCalc = temp*1e6
-        tempCalcErr = error[2]*1e6
-        print('temperature = ' + misc.errString(tempCalc, tempCalcErr) + 'uk')
-        
-    else:
-        tempCalc = None
-        tempCalcErr = None
+        for temp, err, label in zip(temps, tempErrs, ['Hor', 'Vert', 'Hor2D', 'Vert2D']): 
+            print(label + ' temperature = ' + misc.errString(temp*1e6, err*1e6) + 'uk')
 
     for fid in fids:
         if type(fid) == int:
@@ -380,17 +421,216 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=[None], bgPc
             with exp.ExpFile(fid) as file:
                 file.get_basic_info()
     if trackFitCenter:
-        print('Acceleration in Mpix/s^2 = ' + misc.errString(accelFit[1], accelErr[1]))
-    
-    return {'images':images, 'fits':fitParams, 'cov':fitCovs, 'pics':sortedStackedPics, 'sigmas':sigmas, 'sigmaErrors':sigmaErrs, 'dataKey':keyPlt, 'totalPhotons':totalPhotons, 'tempCalc':tempCalc, 'tempCalcErr':tempCalcErr}
+        pass
+        #print('Acceleration in Mpix/s^2 = ' + misc.errString(accelFit[1], accelErr[1]))
+    if transferAnalysisOpts is not None and showTferAnalysisPlots:
+        colors, colors2 = misc.getColors(len(transferAnalysisOpts.initLocs()) + 2)#, cmStr=dataColor)
+        pltShape = (transferAnalysisOpts.initLocsIn[-1], transferAnalysisOpts.initLocsIn[-2])
+        # mp.plotThresholdHists([initThresholds[0][0],initThresholds[1][0]], colors, shape=pltShape)
+        mp.plotThresholdHists([initThresholds[0][0], initThresholds[0][0]], colors, shape=[1,2])
+    returnDictionary = {'images':images, 'fits':hFitParams, 'errs':hFitErrs, 'hSigmas':hSigmas, 'sigmaErrors':hSigmaErrs, 'dataKey':keyPlt, 
+            'hTotalPhotons':hTotalPhotons, 'tempCalc':temps, 'tempCalcErr':tempErrs, 'initThresholds':initThresholds[0], 
+            '2DFit':fitParams2D, '2DErr':fitErrs2D, 'bgPics':picsForBg, 'dataLength':datalen}
+    if returnPics: 
+        returnDictionary['pics'] = sortedStackedPics
+        
 
-def getBgImgs(fid):
-    with exp.ExpFile(fid) as file:
-        pics = file.get_pics()
-    #pics2 = pics[1::2]
-    pics2 = pics
-    pics2 = rmHighCountPics(pics2, 7000)
-    avgBg = np.mean(pics2,0)
-    avgPcBg = photonCounting(pics2, 120) / len(pics2)
+    imageDict = returnDictionary['images']
+    meanList = []
+    keyDict = []
+    for key, array in imageDict.items():
+        xData = key
+        yData = np.mean(array[2])
+        meanList.append(yData)
+        keyDict.append(xData)
+    if len(meanList) == 1:
+        normalized_mean = yData
+    else:    
+        mean = meanList
+        normalized_mean = (meanList - np.min(meanList)) / (np.max(meanList) - np.min(meanList))
+    keyList = [float(num) for num in keyDict]
+    return keyList,normalized_mean,mean
+
+#     return returnDictionary
+
+def getBgImgs(bgSource, startPic=1, picsPerRep=2, rmHighCounts=True, bgWeights=[], weightBackgrounds=True):
+    """ Probably should test with old-fashioned methods, but as of now basically just expects the source to be a 2D array of pictures, i.e. a 4d array.
+    """
+    if type(bgSource) == int:
+        with exp.ExpFile(bgSource) as file:
+            allpics = file.get_pics() # probably fails
+    if type(bgSource) == type(np.array([])) or type(bgSource) == type([]):
+        allpics = bgSource
+    #bgPics = allpics[startPic::picsPerRep]
+    bgPics = [setPics[startPic::picsPerRep] for setPics in allpics]
+    if rmHighCounts:
+        bgPics = [rmHighCountPics(setPics, 7000) for setPics in bgPics]
+    if weightBackgrounds:
+        assert(len(bgPics) == len(bgWeights))
+        avgPcBg = avgBg = np.zeros(np.array(bgPics[0][0]).shape)
+        for weight, setPics in zip(bgWeights, bgPics):
+            avgBg += weight/sum(bgWeights) * np.mean(setPics,0)
+            avgPcBg += weight/sum(bgWeights)*photonCounting(setPics, 120)[0] / len(setPics)
+    else:
+        avgBg = np.mean(bgPics,0)
+        avgPcBg = photonCounting(bgPics, 120)[0] / len(bgPics)
     return avgBg, avgPcBg
 
+
+def freeSpaceBackgroundPic(fid):
+    with exp.ExpFile() as file:
+        file.open_hdf5(fid, useBase = False)
+        plt.figure(figsize=(5,3))
+        rawData = file.get_pics()
+        avrg_pic_bg = sum(map(np.array, rawData))/len(rawData)  
+        plt.imshow(avrg_pic_bg)       
+        return avrg_pic_bg
+    
+    
+
+def freeSpaceTemp_imgs_post(fid, bg_fid,useBase=True,picsPerRep=1, startPic=0,threshold=10, binningParams=None, win=pw.PictureWindow(), transferAnalysisOpts=None,extraTferAnalysisArgs={}): 
+    sortedStackedPics = {}
+
+    for filenum, fid in enumerate(fid):
+        if transferAnalysisOpts is not None:
+            res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
+            (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
+             avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,hmm) = res
+            allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics]   
+            
+        else:
+ 
+            with exp.ExpFile(fid) as file: 
+                allFSIPics = file.get_pics()
+                _, key = file.get_key()
+                if len(np.array(key).shape) == 2:
+                    key = key[:,0]
+                file.get_basic_info()
+            allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
+        with exp.ExpFile() as file:
+            file.open_hdf5(bg_fid, useBase = False)
+            bgRawData = file.get_pics()
+            avrgBgPic = sum(map(np.array, bgRawData))/len(bgRawData)
+        for i, keyV in enumerate(key):
+            keyV = misc.round_sig_str(keyV)
+            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
+        avgPics = {}
+        sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
+        sortedKey = list(sorted(sortedStackedKeyFl))
+        pics4fit = []
+        for label, items in sortedStackedPics.items():
+            avgPic = sum(map(np.array, items))/len(items)
+            avgPics[label] = avgPic
+            pics4fit.append(avgPic)
+        psfs2D,psfs1DV,psfs1DH=[],[],[]
+        for num, (label, items) in enumerate(avgPics.items(),1):
+            plt.subplot(1, 6, num)
+            plt.imshow(items,cmap=dark_viridis_cmap)
+            plt.title(label) 
+            _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items, guessSigma_x=1, guessSigma_y=1, showFit=False, fitF=gaussian_2d.f_notheta) 
+            pixel_size = 16
+            mag = 64
+            psfs2D.append(pictureFitParams2d[3]*pixel_size/mag)
+            psfs1DV.append(v_params[2]*pixel_size/mag)
+            psfs1DH.append(h_params[2]*pixel_size/mag)
+        plt.plot(key,psfs1DH)
+        print('2D waists',psfs2D)
+        print('1D Vertical waists',psfs1DV)
+        print('1D Horiztonal waists',psfs1DH)
+        
+    return pics4fit,key, psfs1DH
+
+def freeSpaceImgs_single(fid, bg_fid,useBase=True,picsPerRep=1, startPic=0,threshold=10, binningParams=None, win=pw.PictureWindow(), transferAnalysisOpts=None,extraTferAnalysisArgs={}): 
+    sortedStackedPics = {}
+    for filenum, fid in enumerate(fid):
+        if transferAnalysisOpts is not None:
+            res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
+            (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
+             avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,hmm) = res
+            allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics]   
+            
+        else:
+ 
+            with exp.ExpFile(fid) as file: 
+                allFSIPics = file.get_pics()
+                _, key = file.get_key()
+                if len(np.array(key).shape) == 2:
+                    key = key[:,0]
+                file.get_basic_info()
+            allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
+        with exp.ExpFile() as file:
+            file.open_hdf5(bg_fid, useBase = False)
+            bgRawData = file.get_pics()
+            avrgBgPic = sum(map(np.array, bgRawData))/len(bgRawData)
+        for i, keyV in enumerate(key):
+            keyV = misc.round_sig_str(keyV)
+            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
+        avgPics = {}
+        sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
+        sortedKey = list(sorted(sortedStackedKeyFl))
+        pics4fit = []
+        for label, items in sortedStackedPics.items():
+            avgPic = sum(map(np.array, items))/len(items)
+            avgPics[label] = avgPic
+            pics4fit.append(avgPic)
+        psfs2D,psfs1DV,psfs1DH=[],[],[]
+        for num, (label, items) in enumerate(avgPics.items(),1):
+            plt.figure(figsize=(8, 8)) 
+            plt.subplot(1, 1, num)
+            plt.imshow(items,cmap=dark_viridis_cmap)
+            # plt.title(label) 
+            _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items, guessSigma_x=1, guessSigma_y=1, showFit=False, fitF=gaussian_2d.f_notheta) 
+            pixel_size = 16
+            mag = 64
+            psfs2D.append(pictureFitParams2d[3]*pixel_size/mag)
+            psfs1DV.append(v_params[2]*pixel_size/mag)
+            psfs1DH.append(h_params[2]*pixel_size/mag)
+        plt.plot(key,psfs1DH)
+        print('2D waists',psfs2D)
+        print('1D Vertical waists',psfs1DV)
+        print('1D Horiztonal waists',psfs1DH)
+        print('amplitude', h_params[0],h_params[1],h_params[2],h_params[3])
+        print('amplitude', pictureFitParams2d[0],pictureFitParams2d[1],pictureFitParams2d[2],pictureFitParams2d[3]*pixel_size/mag)
+
+    return pics4fit,key, psfs1DH
+
+def freeSpaceImgs_single_noBG(fid,useBase=True,picsPerRep=1, startPic=0,threshold=10, binningParams=None, win=pw.PictureWindow(), transferAnalysisOpts=None,extraTferAnalysisArgs={}): 
+    sortedStackedPics = {}
+    picsForBg = []
+    bgWeights = []
+    for filenum, fid in enumerate(fid):
+        res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
+        (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
+         avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,hmm) = res
+        allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics] 
+    for i, keyV in enumerate(key):
+        keyV = misc.round_sig_str(keyV)
+        sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
+        avgPics = {}
+        sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
+        sortedKey = list(sorted(sortedStackedKeyFl))
+        pics4fit = []
+        for label, items in sortedStackedPics.items():
+            avgPic = sum(map(np.array, items))/len(items)
+            avgPics[label] = avgPic
+            pics4fit.append(avgPic)
+        psfs2D,psfs1DV,psfs1DH=[],[],[]
+        for num, (label, items) in enumerate(avgPics.items(),1):
+            plt.figure(figsize=(8, 8)) 
+            plt.subplot(1, 1, num)
+            plt.imshow(items,cmap=dark_viridis_cmap)
+            plt.title(label) 
+            _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items, guessSigma_x=1, guessSigma_y=1, showFit=False, fitF=gaussian_2d.f_notheta) 
+            pixel_size = 16
+            mag = 64
+            psfs2D.append(pictureFitParams2d[3]*pixel_size/mag)
+            psfs1DV.append(v_params[2]*pixel_size/mag)
+            psfs1DH.append(h_params[2]*pixel_size/mag)
+        # plt.plot(key,psfs1DH)
+        # print('2D waists',psfs2D)
+        # print('1D Vertical waists',psfs1DV)
+        # print('1D Horiztonal waists',psfs1DH)
+        # print('amplitude', h_params[0],h_params[1],h_params[2],h_params[3])
+        # print('amplitude', pictureFitParams2d[0],pictureFitParams2d[1],pictureFitParams2d[2],pictureFitParams2d[3]*pixel_size/mag)
+
+#     return key, psfs1DH

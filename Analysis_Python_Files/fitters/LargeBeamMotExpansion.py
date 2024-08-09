@@ -1,5 +1,5 @@
 import numpy as np
-from .. import MarksConstants as mc
+from .. import Constants as mc
 
 def center():
     return None

@@ -281,6 +281,7 @@ Rb87_a12 = 97.66 * a0
 # the number given is in atomic units, once multiplying by Eh and a0 this is in SI units. 
 Eh = 4.35974381e-18
 Rb87_C3 = 9.202*Eh*a0**3
+Rb87_C3_atomic = 9.202
 Rb87_C6Sigma = 12.05e3*Eh*a0**6
 Rb87_C6Pi = 8.047e3*Eh*a0**6
 Rb87_C8Sigma_1 = 2.805e6*Eh*a0**8
@@ -332,5 +333,5 @@ uTrap = [0, 1, 0]
 
 IsatD1 = 44.84  # I_sat for pi polarized D1 transistion W/m^2
 IsatD2 = 25.03 # I_sat for pi polarized D2 transistion W/m^2
-muD1 = 2.537e-29 # dipole transition matrix element for D1
-muD2 = 3.584e-29 # dipole transition matrix element for D2
+muD1 = 2.537e-29 # dipole transition matrix element for D1 C*m
+muD2 = 3.584e-29 # dipole transition matrix element for D2 C*m

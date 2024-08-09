@@ -9,7 +9,7 @@ from .fitters import linear
 from . import ExpFile as exp
 from .TimeTracker import TimeTracker
 from . import AnalysisHelpers as ah
-from . import MarksConstants as mc
+from . import Constants as mc
 import copy
 from . import PictureWindow as pw
 
