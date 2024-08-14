@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize as opt
 import IPython.display as disp
+import matplotlib 
 
 from .fitters.Gaussian import bump3, bump, gaussian_2d
 from .fitters import LargeBeamMotExpansion 
@@ -13,12 +14,12 @@ from . import Miscellaneous as misc
 from . import MatplotlibPlotters as mp
 from . import ExpFile as exp
 from . import AnalysisHelpers as ah
-from . import TransferAnalysis as ta
+from . import TransferAnalysis_FSI as ta
 from . import PictureWindow as pw
 
 import warnings
 
-viridis = cm.get_cmap('viridis', 256)
+viridis = matplotlib.colormaps.get_cmap('viridis')
 dark_viridis = []
 bl = 0.15
 for i in range(256):
@@ -65,13 +66,13 @@ def getBgImgs(fid, incr=2,startPic=1, rmHighCounts=True):
 
 
 def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcInput=None, shapes=[None], zeroCorrection=0, zeroCorrectionPC=0,
-                            keys=None, fitModule=bump, extraPicDictionaries=None, newAnnotation=False, onlyThisPic=None, pltVSize=5,              
+                            keys=None, fitModule=bump, extraPicDictionaries=None, newAnnotation=False, onlyThisPic=None, pltVSize=5,           
                             plotSigmas=False, plotCounts=False, manualColorRange=None, calcTemperature=False, clearOutput=True, 
                             dataRange=None, guessTemp=10e-6, trackFitCenter=False, picsPerRep=1, startPic=0, binningParams=None, 
                             win=pw.PictureWindow(), transferAnalysisOpts=None, tferBinningParams=None, tferWin= pw.PictureWindow(),
                             extraTferAnalysisArgs={}, emGainSetting=300, lastConditionIsBackGround=True, showTferAnalysisPlots=True,
                             show2dFitsAndResiduals=True, plotFitAmps=False, indvColorRanges=False, fitF2D=gaussian_2d.f_notheta, 
-                            rmHighCounts=True, useBase=True, weightBackgroundByLoading=True, returnPics=False, forceNoAnnotation=False):
+                            rmHighCounts=True, useBase=True, weightBackgroundByLoading=True, returnPics=False, returnMeans=False, forceNoAnnotation=False):
     """
     returnPics is false by default in order to conserve memory. The total picture arrays of lots of experiments can take up a lot of RAM and are usually unnecessary,
     """
@@ -86,24 +87,24 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
         if transferAnalysisOpts is not None:
             res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
             (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
-             avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,hmm) = res
+             avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,condhitlist) = res
             isAnnotatedList.append(isAnnotated)
             # assumes that you only want to look at the first condition. 
             for varPics in groupedPostSelectedPics: # don't remember why 0 works if false...
                 picsForBg.append(varPics[-1 if lastConditionIsBackGround else 0])
                 bgWeights.append(len(varPics[0]))
-            allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics] # get PGC images (variations, pic #, unbinned rows, unbinned columns)
+            allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics]
             if showTferAnalysisPlots:
                 fig, axs = plt.subplots(1,2)
                 mp.makeAvgPlts( axs[0], axs[1], avgPics, transferAnalysisOpts, ['r','g','b'] ) 
-            allFSIPics = [win.window( np.array(pics) ) for pics in allFSIPics] # window PGC pics
-            allFSIPics = ah.softwareBinning( binningParams, allFSIPics ) # bin PGC pics
+            allFSIPics = [win.window( np.array(pics) ) for pics in allFSIPics]
+            allFSIPics = ah.softwareBinning( binningParams, allFSIPics )
         elif type(fid) == int:
             ### For looking at either PGC imgs or FSI imgs 
             with exp.ExpFile(fid) as file:
                 # I think this only makes sense if there is a specific bg pic in the rotation
                 picsForBg.append(list(file.get_pics()))
-#                 allFSIPics = file.get_pics()[startPic::picsPerRep]
+                allFSIPics = file.get_pics()[startPic::picsPerRep]
                 _, key = file.get_key()
                 if len(np.array(key).shape) == 2:
                     key = key[:,0]
@@ -125,7 +126,7 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
             key = keys[filenum]
         for i, keyV in enumerate(key):
             keyV = misc.round_sig_str(keyV)
-            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i]   # organize PGC pics by variation  {var 1: data (pic #, rows, columns), var 2:...}
+            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i]         
     if lastConditionIsBackGround:
         bgInput, pcBgInput = getBgImgs(picsForBg, startPic = startPic, picsPerRep = picsPerRep, rmHighCounts=rmHighCounts, bgWeights=bgWeights, 
                                        weightBackgrounds=weightBackgroundByLoading)
@@ -183,7 +184,7 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
         for imnum, (im, guess) in enumerate(zip(images[keyV], guesses[vari])):
             if fit:
                 # fancy guess_x and guess_y values use the initial fitted value, typically short time, as a guess.
-                _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic( 
+                _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(
                     im, guessSigma_x=5, guessSigma_y=5, showFit=False, 
                     guess_x=None if vari==0 else fitParams2D[initKeyv][imnum][1], guess_y=None if vari==0 else fitParams2D[initKeyv][imnum][2],
                     fitF=fitF2D)
@@ -248,7 +249,6 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
             keyPlt[vari] = keyV
             res = mp.fancyImshow(fig, ax, im, imageArgs={'cmap':dark_viridis_cmap, 'vmin':min_, 'vmax':max_}, 
                                  hFitParams=hparams, vFitParams=vparams, fitModule=fitModule, flipVAx = True, fitParams2D=param2d)
-#             ax.set_title(keyV) 
             ax.set_title(keyV + ': ' + str(datalen[keyV]) + ';\n' + title + ': ' + misc.errString(hSigmas[vari][which],hSigmaErrs[vari][which]) 
                 + r'$\mu m$ sigma, ' + misc.round_sig_str(totalSignal[vari][which],5), fontsize=12)            
             if show2dFitsAndResiduals:
@@ -266,8 +266,8 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
             if onlyThisPic is not None:
                 break
     
-#     mp.fancyImshow(avgPicFig, avgPicAx, np.mean([img[onlyThisPic] for img in images.values()],axis=0), imageArgs={'cmap':dark_viridis_cmap},flipVAx = True)
-#     avgPicAx.set_title('Average Over Variations')
+    mp.fancyImshow(avgPicFig, avgPicAx, np.mean([img[onlyThisPic] for img in images.values()],axis=0), imageArgs={'cmap':dark_viridis_cmap},flipVAx = True)
+    avgPicAx.set_title('Average Over Variations')
     ### Plotting background and photon counted background
     mp.fancyImshow(bgFig, bgAxs[0], bgAvg, imageArgs={'cmap':dark_viridis_cmap},flipVAx = True) 
     bgAxs[0].set_title('Background image (' + str(len(picsForBg)/picsPerRep) + ')')
@@ -313,7 +313,7 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
             for num, fitV in enumerate(tempFitVs):
                 #ax.plot(xPoints*1e3, LargeBeamMotExpansion.f(xPoints, *myGuess)*1e6, label = 'guess')
                 ax.plot(xPoints*1e3, LargeBeamMotExpansion.f(xPoints, *fitV)*1e6, color=colors[num])
-        ax.legend()
+        ax.legend(prop={'size': 12}, markerscale=1)
 
     if plotFitAmps: 
         ax = (axs if numAxisCol == 1 else axs[0])
@@ -371,11 +371,11 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
                 hTotalPhotons = countToScatteredPhotonEM*totalCountsPerPic
                 ax.plot(keyPlt, totalSignal[:,whichPic], marker='o', linestyle='', label=titles[whichPic]);
                 photon_axis.plot(keyPlt, hTotalPhotons, marker='o', linestyle='', color = ['red', 'orange', 'yellow', 'pink'][whichPic])               
-        ax.legend()
-        photon_axis.legend()
+        ax.legend(prop={'size': 12}, markerscale=1)
+        photon_axis.legend(prop={'size': 12}, markerscale=1)
         [tick.set_color('red') for tick in photon_axis.yaxis.get_ticklines()]
         [tick.set_color('red') for tick in photon_axis.yaxis.get_ticklabels()]
-        photon_axis.set_ylabel(r'Fit-Based Avg Scattered Photon/Img', color = 'r')
+        photon_axis.set_ylabel(r'Fit-Based Avg Scattered Photon/Img', color = 'r',fontsize = 12)
     if trackFitCenter:
         #numaxcol = 1: ax = axs
         #numaxcol = 2: trackfitcenter + plothSigmas: ax = axs[1]
@@ -414,13 +414,13 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
         for temp, err, label in zip(temps, tempErrs, ['Hor', 'Vert', 'Hor2D', 'Vert2D']): 
             print(label + ' temperature = ' + misc.errString(temp*1e6, err*1e6) + 'uk')
 
-#     for fid in fids:
-#         if type(fid) == int:
-#             expTitle, _, lev = exp.getAnnotation(fid)
-#             expTitle = ''.join('#' for _ in range(lev)) + ' File ' + str(fid) + ': ' + expTitle
-#             disp.display(disp.Markdown(expTitle))
-#             with exp.ExpFile(fid) as file:
-#                 file.get_basic_info()
+    for fid in fids:
+        if type(fid) == int:
+            expTitle, _, lev = exp.getAnnotation(fid)
+            expTitle = ''.join('#' for _ in range(lev)) + ' File ' + str(fid) + ': ' + expTitle
+            disp.display(disp.Markdown(expTitle))
+            with exp.ExpFile(fid) as file:
+                file.get_basic_info()
     if trackFitCenter:
         pass
         #print('Acceleration in Mpix/s^2 = ' + misc.errString(accelFit[1], accelErr[1]))
@@ -434,7 +434,25 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
             '2DFit':fitParams2D, '2DErr':fitErrs2D, 'bgPics':picsForBg, 'dataLength':datalen}
     if returnPics: 
         returnDictionary['pics'] = sortedStackedPics
-    return returnDictionary
+        
+
+    imageDict = returnDictionary['images']
+    meanList = []
+    keyDict = []
+    for key, array in imageDict.items():
+        xData = key
+        yData = np.mean(array[2])
+        meanList.append(yData)
+        keyDict.append(xData)
+    if len(meanList) == 1:
+        normalized_mean = yData
+    else:    
+        mean = meanList
+        normalized_mean = (meanList - np.min(meanList)) / (np.max(meanList) - np.min(meanList))
+    keyList = [float(num) for num in keyDict]
+    return keyList,normalized_mean,mean
+
+#     return returnDictionary
 
 def getBgImgs(bgSource, startPic=1, picsPerRep=2, rmHighCounts=True, bgWeights=[], weightBackgrounds=True):
     """ Probably should test with old-fashioned methods, but as of now basically just expects the source to be a 2D array of pictures, i.e. a 4d array.
@@ -460,74 +478,6 @@ def getBgImgs(bgSource, startPic=1, picsPerRep=2, rmHighCounts=True, bgWeights=[
     return avgBg, avgPcBg
 
 
-def freeSpaceTemp_imgs(fid, bg_fid):
-    sortedStackedPics = {}
-    with exp.ExpFile() as file:
-        file.open_hdf5(bg_fid, useBase = False)
-        bgRawData = file.get_pics()
-        avrgBgPic = sum(map(np.array, bgRawData))/len(bgRawData) 
-    with exp.ExpFile(fid) as file: 
-        allFSIPics = file.get_pics()
-        _, key = file.get_key()
-        if len(np.array(key).shape) == 2:
-            key = key[:,0]
-        file.get_basic_info()
-    allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
-    for i, keyV in enumerate(key):
-        keyV = misc.round_sig_str(keyV)
-        sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
-    avgPics = {}
-    sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
-    sortedKey = list(sorted(sortedStackedKeyFl))
-    for label, items in sortedStackedPics.items():
-        avgPic = sum(map(np.array, items))/len(items)
-        avgPics[label] = avgPic
-    waists=[]
-    for num, (label, items) in enumerate(avgPics.items(),1):
-        plt.subplot(1, 6, num)
-        plt.imshow(items-avrgBgPic,cmap=dark_viridis_cmap)
-        plt.title(label) 
-        _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items-avrgBgPic, guessSigma_x=5, guessSigma_y=5, showFit=False,guess_x=2, guess_y=2, fitF=gaussian_2d.f_notheta) 
-        pixel_size = 16
-        mag = 64
-        waists.append((pictureFitParams2d[3]+pictureFitParams2d[4])/2* pixel_size/mag)
-    return(waists)
-
-
-def freeSpaceTemp_2pics(fid, bg_fid):
-    sortedStackedPics = {}
-    with exp.ExpFile() as file:
-        file.open_hdf5(bg_fid, useBase = False)
-        bgRawData = file.get_pics()
-        avrgBgPic = sum(map(np.array, bgRawData))/len(bgRawData) 
-    with exp.ExpFile(fid) as file: 
-        allFSIPics = file.get_pics()
-        _, key = file.get_key()
-        if len(np.array(key).shape) == 2:
-            key = key[:,0]
-        file.get_basic_info()
-    allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
-    for i, keyV in enumerate(key):
-        keyV = misc.round_sig_str(keyV)
-        sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
-    avgPics = {}
-    sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
-    sortedKey = list(sorted(sortedStackedKeyFl))
-    for label, items in sortedStackedPics.items():
-        avgPic = sum(map(np.array, items))/len(items)
-        avgPics[label] = avgPic
-    waists=[]
-    for num, (label, items) in enumerate(avgPics.items(),1):
-        plt.subplot(1, 6, num)
-        plt.imshow(items-avrgBgPic,cmap=dark_viridis_cmap)
-        plt.title(label) 
-        _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items-avrgBgPic, guessSigma_x=5, guessSigma_y=5, showFit=False,guess_x=2, guess_y=2, fitF=gaussian_2d.f_notheta) 
-        pixel_size = 16
-        mag = 64
-        waists.append((pictureFitParams2d[3]+pictureFitParams2d[4])/2* pixel_size/mag)
-    return(waists)
-
-
 def freeSpaceBackgroundPic(fid):
     with exp.ExpFile() as file:
         file.open_hdf5(fid, useBase = False)
@@ -536,3 +486,152 @@ def freeSpaceBackgroundPic(fid):
         avrg_pic_bg = sum(map(np.array, rawData))/len(rawData)  
         plt.imshow(avrg_pic_bg)       
         return avrg_pic_bg
+    
+    
+
+def freeSpaceTemp_imgs_post(fid, bg_fid,useBase=True,picsPerRep=1, startPic=0,threshold=10, binningParams=None, win=pw.PictureWindow(), transferAnalysisOpts=None,extraTferAnalysisArgs={}): 
+    sortedStackedPics = {}
+
+    for filenum, fid in enumerate(fid):
+        if transferAnalysisOpts is not None:
+            res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
+            (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
+             avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,hmm) = res
+            allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics]   
+            
+        else:
+ 
+            with exp.ExpFile(fid) as file: 
+                allFSIPics = file.get_pics()
+                _, key = file.get_key()
+                if len(np.array(key).shape) == 2:
+                    key = key[:,0]
+                file.get_basic_info()
+            allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
+        with exp.ExpFile() as file:
+            file.open_hdf5(bg_fid, useBase = False)
+            bgRawData = file.get_pics()
+            avrgBgPic = sum(map(np.array, bgRawData))/len(bgRawData)
+        for i, keyV in enumerate(key):
+            keyV = misc.round_sig_str(keyV)
+            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
+        avgPics = {}
+        sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
+        sortedKey = list(sorted(sortedStackedKeyFl))
+        pics4fit = []
+        for label, items in sortedStackedPics.items():
+            avgPic = sum(map(np.array, items))/len(items)
+            avgPics[label] = avgPic
+            pics4fit.append(avgPic)
+        psfs2D,psfs1DV,psfs1DH=[],[],[]
+        for num, (label, items) in enumerate(avgPics.items(),1):
+            plt.subplot(1, 6, num)
+            plt.imshow(items,cmap=dark_viridis_cmap)
+            plt.title(label) 
+            _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items, guessSigma_x=1, guessSigma_y=1, showFit=False, fitF=gaussian_2d.f_notheta) 
+            pixel_size = 16
+            mag = 64
+            psfs2D.append(pictureFitParams2d[3]*pixel_size/mag)
+            psfs1DV.append(v_params[2]*pixel_size/mag)
+            psfs1DH.append(h_params[2]*pixel_size/mag)
+        plt.plot(key,psfs1DH)
+        print('2D waists',psfs2D)
+        print('1D Vertical waists',psfs1DV)
+        print('1D Horiztonal waists',psfs1DH)
+        
+    return pics4fit,key, psfs1DH
+
+def freeSpaceImgs_single(fid, bg_fid,useBase=True,picsPerRep=1, startPic=0,threshold=10, binningParams=None, win=pw.PictureWindow(), transferAnalysisOpts=None,extraTferAnalysisArgs={}): 
+    sortedStackedPics = {}
+    for filenum, fid in enumerate(fid):
+        if transferAnalysisOpts is not None:
+            res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
+            (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
+             avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,hmm) = res
+            allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics]   
+            
+        else:
+ 
+            with exp.ExpFile(fid) as file: 
+                allFSIPics = file.get_pics()
+                _, key = file.get_key()
+                if len(np.array(key).shape) == 2:
+                    key = key[:,0]
+                file.get_basic_info()
+            allFSIPics = np.reshape( allFSIPics, (len(key), int(allFSIPics.shape[0]/len(key)), allFSIPics.shape[1], allFSIPics.shape[2]) )
+        with exp.ExpFile() as file:
+            file.open_hdf5(bg_fid, useBase = False)
+            bgRawData = file.get_pics()
+            avrgBgPic = sum(map(np.array, bgRawData))/len(bgRawData)
+        for i, keyV in enumerate(key):
+            keyV = misc.round_sig_str(keyV)
+            sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
+        avgPics = {}
+        sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
+        sortedKey = list(sorted(sortedStackedKeyFl))
+        pics4fit = []
+        for label, items in sortedStackedPics.items():
+            avgPic = sum(map(np.array, items))/len(items)
+            avgPics[label] = avgPic
+            pics4fit.append(avgPic)
+        psfs2D,psfs1DV,psfs1DH=[],[],[]
+        for num, (label, items) in enumerate(avgPics.items(),1):
+            plt.figure(figsize=(8, 8)) 
+            plt.subplot(1, 1, num)
+            plt.imshow(items,cmap=dark_viridis_cmap)
+            # plt.title(label) 
+            _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items, guessSigma_x=1, guessSigma_y=1, showFit=False, fitF=gaussian_2d.f_notheta) 
+            pixel_size = 16
+            mag = 64
+            psfs2D.append(pictureFitParams2d[3]*pixel_size/mag)
+            psfs1DV.append(v_params[2]*pixel_size/mag)
+            psfs1DH.append(h_params[2]*pixel_size/mag)
+        plt.plot(key,psfs1DH)
+        print('2D waists',psfs2D)
+        print('1D Vertical waists',psfs1DV)
+        print('1D Horiztonal waists',psfs1DH)
+        print('amplitude', h_params[0],h_params[1],h_params[2],h_params[3])
+        print('amplitude', pictureFitParams2d[0],pictureFitParams2d[1],pictureFitParams2d[2],pictureFitParams2d[3]*pixel_size/mag)
+
+    return pics4fit,key, psfs1DH
+
+def freeSpaceImgs_single_noBG(fid,useBase=True,picsPerRep=1, startPic=0,threshold=10, binningParams=None, win=pw.PictureWindow(), transferAnalysisOpts=None,extraTferAnalysisArgs={}): 
+    sortedStackedPics = {}
+    picsForBg = []
+    bgWeights = []
+    for filenum, fid in enumerate(fid):
+        res = ta.stage1TransferAnalysis( fid, transferAnalysisOpts, useBase=useBase, **extraTferAnalysisArgs )
+        (initAtoms, tferAtoms, initAtomsPs, tferAtomsPs, key, keyName, initPicCounts, tferPicCounts, repetitions, initThresholds,
+         avgPics, tferThresholds, initAtomImages, tferAtomImages, basicInfoStr, ensembleHits, groupedPostSelectedPics, isAnnotated,hmm) = res
+        allFSIPics = [ varpics[0][startPic::picsPerRep] for varpics in groupedPostSelectedPics] 
+    for i, keyV in enumerate(key):
+        keyV = misc.round_sig_str(keyV)
+        sortedStackedPics[keyV] = np.append(sortedStackedPics[keyV], allFSIPics[i],axis=0) if (keyV in sortedStackedPics) else allFSIPics[i] 
+        avgPics = {}
+        sortedStackedKeyFl = [float(keyStr) for keyStr in sortedStackedPics.keys()]
+        sortedKey = list(sorted(sortedStackedKeyFl))
+        pics4fit = []
+        for label, items in sortedStackedPics.items():
+            avgPic = sum(map(np.array, items))/len(items)
+            avgPics[label] = avgPic
+            pics4fit.append(avgPic)
+        psfs2D,psfs1DV,psfs1DH=[],[],[]
+        for num, (label, items) in enumerate(avgPics.items(),1):
+            plt.figure(figsize=(8, 8)) 
+            plt.subplot(1, 1, num)
+            plt.imshow(items,cmap=dark_viridis_cmap)
+            plt.title(label) 
+            _, pictureFitParams2d, pictureFitErrors2d, v_params, v_errs, h_params, h_errs = ah.fitPic(items, guessSigma_x=1, guessSigma_y=1, showFit=False, fitF=gaussian_2d.f_notheta) 
+            pixel_size = 16
+            mag = 64
+            psfs2D.append(pictureFitParams2d[3]*pixel_size/mag)
+            psfs1DV.append(v_params[2]*pixel_size/mag)
+            psfs1DH.append(h_params[2]*pixel_size/mag)
+        # plt.plot(key,psfs1DH)
+        # print('2D waists',psfs2D)
+        # print('1D Vertical waists',psfs1DV)
+        # print('1D Horiztonal waists',psfs1DH)
+        # print('amplitude', h_params[0],h_params[1],h_params[2],h_params[3])
+        # print('amplitude', pictureFitParams2d[0],pictureFitParams2d[1],pictureFitParams2d[2],pictureFitParams2d[3]*pixel_size/mag)
+
+#     return key, psfs1DH

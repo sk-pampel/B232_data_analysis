@@ -168,13 +168,13 @@ def makeThresholdStatsImages(ax, thresholds, locs, shape, ims, lims, fig):
     thresholdList = [thresh.th for thresh in thresholds]
     print('thresholdList',thresholdList)
     thresholdPic, lims[0][0], lims[0][1] = genAvgDiscrepancyImage(thresholdList, shape, locs)
-    ims.append(ax[0].imshow(thresholdPic, cmap=cm.get_cmap('seismic_r'), vmin=lims[0][0], vmax=lims[0][1], origin='lower'))
+    ims.append(ax[0].imshow(thresholdPic, cmap=mpl.colormaps.get_cmap('seismic_r'), vmin=lims[0][0], vmax=lims[0][1], origin='lower'))
     ax[0].set_title('Thresholds:' + str(misc.round_sig(np.mean(thresholdList))), fontsize=12)
     imageTickedColorbar(fig, ims[-1], ax[0], lims[0])
     
     fidList = [thresh.fidelity for thresh in thresholds]
     thresholdFidPic, lims[1][0], lims[1][1] = genAvgDiscrepancyImage(fidList, shape, locs)
-    ims.append(ax[1].imshow(thresholdFidPic, cmap=cm.get_cmap('seismic_r'), vmin=lims[1][0], vmax=lims[1][1], origin='lower'))
+    ims.append(ax[1].imshow(thresholdFidPic, cmap=mpl.colormaps.get_cmap('seismic_r'), vmin=lims[1][0], vmax=lims[1][1], origin='lower'))
     ax[1].set_title('Threshold Fidelities:' + str(misc.round_sig(np.mean(fidList))), fontsize=12)
     imageTickedColorbar(fig, ims[-1], ax[1], lims[1])
     
@@ -186,14 +186,14 @@ def makeThresholdStatsImages(ax, thresholds, locs, shape, ims, lims, fig):
         else:
             imagePeakDiff.append(0)
     peakDiffImage, lims[2][0], lims[2][1] = genAvgDiscrepancyImage(imagePeakDiff, shape, locs)
-    ims.append(ax[2].imshow(peakDiffImage, cmap=cm.get_cmap('seismic_r'), vmin=lims[2][0], vmax=lims[2][1], origin='lower'))
+    ims.append(ax[2].imshow(peakDiffImage, cmap=mpl.colormaps.get_cmap('seismic_r'), vmin=lims[2][0], vmax=lims[2][1], origin='lower'))
     ax[2].set_title('Imaging-Signal:' + str(misc.round_sig(np.mean(imagePeakDiff))), fontsize=12)
     imageTickedColorbar(fig, ims[-1], ax[2], lims[2])
 
     residualList = [thresh.rmsResidual for thresh in thresholds]
     residualImage, _, lims[3][1] = genAvgDiscrepancyImage(residualList, shape, locs)
     lims[3][0] = 0
-    ims.append(ax[3].imshow(residualImage, cmap=cm.get_cmap('inferno'), vmin=lims[3][0], vmax=lims[3][1], origin='lower'))
+    ims.append(ax[3].imshow(residualImage, cmap=mpl.colormaps.get_cmap('inferno'), vmin=lims[3][0], vmax=lims[3][1], origin='lower'))
     ax[3].set_title('Fit Rms Residuals:' + str(misc.round_sig(np.mean(residualList))), fontsize=12)
     imageTickedColorbar(fig, ims[-1], ax[3], lims[3])
     for a in ax:
@@ -776,7 +776,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
         for ps in anaylsisOpts.postSelectionConditions[dataSetInc]:
             leg += ps.name +','
         leg += ")"
-        unevenErrs = [[err[0] for err in transferErrs[dataSetInc]], [err[1] for err in transferErrs[dataSetInc]]]
+        unevenErrs = [[abs(err[0]) for err in transferErrs[dataSetInc]], [abs(err[1]) for err in transferErrs[dataSetInc]]]
         mainPlot.errorbar ( key, transferData[dataSetInc], yerr=unevenErrs, color=color, ls='',
                             capsize=6, elinewidth=3, label=leg, 
                            alpha=0.3 if plotAvg else 0.9, marker=markers[dataSetInc%len(markers)], markersize=15)
@@ -835,12 +835,12 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
 
     avgFitCharacter = None
     if plotAvg:
-        unevenErrs = [[err[0] for err in avgTransferErr], [err[1] for err in avgTransferErr]]
+        unevenErrs = [[abs(err[0]) for err in avgTransferErr], [abs(err[1]) for err in avgTransferErr]]
         (_, caps, _) = mainPlot.errorbar( key, avgTransferData, yerr=unevenErrs, color="#BBBBBB", ls='',
                            marker='o', capsize=12, elinewidth=5, label='Atom-Avg', markersize=10,   )
         for cap in caps:
             cap.set_markeredgewidth(1.5)
-        unevenErrs = [[err[0] for err in transVarErr], [err[1] for err in transVarErr]]
+        unevenErrs = [[abs(err[0]) for err in transVarErr], [abs(err[1]) for err in transVarErr]]
         (_, caps, _) = mainPlot.errorbar( key, transVarAvg, yerr=unevenErrs, color=avgColor, ls='',
                            marker='o', capsize=12, elinewidth=5, label='Event-Avg', markersize=10 )
         for cap in caps:
@@ -853,7 +853,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
     if fitModules[0] is not None and showFitCharacterPlot:
         f, ax = subplots()
         fitCharacterPic, vmin, vmax = genAvgDiscrepancyImage(fitCharacters, avgPics[0].shape, analysisOpts.initLocs())
-        im = ax.imshow(fitCharacterPic, cmap=cm.get_cmap('seismic_r'), vmin=vmin, vmax=vmax, origin='lower')
+        im = ax.imshow(fitCharacterPic, cmap=mpl.colormaps.get_cmap('seismic_r'), vmin=vmin, vmax=vmax, origin='lower')
         ax.set_title('Fit-Character (white is average)')
         #ax.grid(False)
         f.colorbar(im)
@@ -896,7 +896,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
                           'Avg Load:' + str(misc.round_sig(np.mean(avgPops))),'Atom-Generation: ' + str(misc.round_sig(np.mean(genAtomAvgs)))]
 
                 for i, (ax, lim, image, cmap_) in enumerate(zip(axs.flatten(), lims, images, cmaps)):
-                    ims[i] = ax.imshow(image, vmin=lim[0], vmax=lim[1], origin='lower', cmap=cm.get_cmap(cmap_))
+                    ims[i] = ax.imshow(image, vmin=lim[0], vmax=lim[1], origin='lower', cmap=mpl.colormaps.get_cmap(cmap_))
                 for ax, lim, title, im in zip(axs.flatten(), lims, titles, ims):
                     ax.set_yticklabels([])
                     ax.set_xticklabels([])
@@ -939,7 +939,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
                       'Avg Load:' + str(misc.round_sig(np.mean(avgPops))),'Atom-Generation: ' + str(misc.round_sig(np.mean(genAtomAvgs)))]
 
             for i, (ax, lim, image, cmap_) in enumerate(zip(axs.flatten(), lims, images, cmaps)):
-                ims[i] = ax.imshow(image, vmin=lim[0], vmax=lim[1], origin='lower', cmap=cm.get_cmap(cmap_))
+                ims[i] = ax.imshow(image, vmin=lim[0], vmax=lim[1], origin='lower', cmap=mpl.colormaps.get_cmap(cmap_))
             for ax, lim, title, im in zip(axs.flatten(), lims, titles, ims):
                 ax.set_yticklabels([])
                 ax.set_xticklabels([])
@@ -1137,7 +1137,7 @@ def Population(fileNum, atomLocations, whichPic, picsPerRep, plotLoadingRate=Tru
                 pass
                 #leg += (typeName + " % = " + str(round_sig(allPops[i][0])) + "$\pm$ "
                 #        + str(round_sig(allPopsErr[i][0])))
-            unevenErrs = [[err[0] for err in allPopsErr[i]], [err[1] for err in allPopsErr[i]]]
+            unevenErrs = [[abs(err[0]) for err in allPopsErr[i]], [abs(err[1]) for err in allPopsErr[i]]]
             mainPlot.errorbar(key, allPops[i], yerr=unevenErrs, color=colors[i], ls='',
                               capsize=6, elinewidth=3, label=leg, alpha=mainAlpha, marker=markers[i%len(markers)],markersize=5)
             if module is not None:
@@ -1244,7 +1244,7 @@ def Population(fileNum, atomLocations, whichPic, picsPerRep, plotLoadingRate=Tru
         figure()
         print('fitCharacter',fitCharacters)
         fitCharacterPic, vmin, vmax = genAvgDiscrepancyImage(fitCharacters, avgPic.shape, atomLocations)
-        imshow(fitCharacterPic, cmap=cm.get_cmap('seismic_r'), vmin=vmin, vmax=vmax, origin='lower')
+        imshow(fitCharacterPic, cmap=mpl.colormaps.get_cmap('seismic_r'), vmin=vmin, vmax=vmax, origin='lower')
         title('Fit-Character (white is average)')
         colorbar()
     if showImagePlots:
@@ -1259,7 +1259,7 @@ def Population(fileNum, atomLocations, whichPic, picsPerRep, plotLoadingRate=Tru
         for l in allPops:
             avgPops.append(np.mean(l))
         avgPopPic, vmin, vmax = genAvgDiscrepancyImage(avgPops, avgPic.shape, atomLocations)
-        ims.append(axs[1].imshow(avgPopPic, cmap=cm.get_cmap('seismic_r'), vmin=vmin, vmax=vmax, origin='lower'))
+        ims.append(axs[1].imshow(avgPopPic, cmap=mpl.colormaps.get_cmap('seismic_r'), vmin=vmin, vmax=vmax, origin='lower'))
         axs[1].set_title('Avg Population')
         
         makeThresholdStatsImages(axs[2:], thresholds, atomLocations, avgPic.shape, ims, lims, f_im)
@@ -1384,4 +1384,35 @@ def showPics(data, key, fitParams=None, indvColorBars=False, colorMax=-1, fancy=
         picCount += 1
     return fig
 
+def singleAtomTemp(fileId,atomlocs):
+    dataset1 = TransferAnalysis.standardTransferAnalysis(fileId, tao.getStandardSurvivalOptions(atomlocs));
+    (tferAtomsVarAvg, tferAtomsVarErrs, loadAtomsVarAvg, initPicCounts, keyName, key1, repetitions, initThresholds, 
+                fits, avgTferData1, avgTferErr1, avgFit, avgPics, genAvgs, genErrs, tferVarAvg, tferVarErr, initAtomImages, 
+                tferAtomImages, tferPicCounts, tferThresholds, fitModules, basicInfoStr, ensembleHits, tOptions, analysisOpts,
+                tferAtomsPs, tferAtomsPs, tferList, isAnnotated, hmm) = dataset1
+    
+    color1 = 'tab:green'
+    upperbound = []
+    lowerbound = []
+    for i in np.arange(0,len(avgTferErr1)):
+        up = avgTferErr1[i][0]
+        lo = avgTferErr1[i][1]
+        upperbound.append(up)  
+        lowerbound.append(lo)
+    err1= [upperbound,lowerbound]   
+    
+    fig, ax = plt.subplots(figsize=(15, 6))
+    # t = np.linspace(0, 50e-3, 100)
+    ax.errorbar(key1*1e-3,avgTferData1, yerr=err1,ls='none',ecolor=color1,marker = 'o',markersize = 10,markerfacecolor=color1,markeredgecolor='k',capsize=5)
+    
+    ah.releaseRecaptureTemp(key1,avgTferData1,err1,tempGuess=20e-6,
+                            trapDepth=1e-3,rrange=(1e-6,200e-6,0.2e-6),color=color1)
+    
+    # plt.legend(bbox_to_anchor=(.6, 1.001), ncol = 2,prop={'size': 15},frameon=False)
+    plt.legend(loc=1, ncol = 2,prop={'size': 12})
+    plt.ylim(0,1)
+    # plt.xlim(0,.02)
+    plt.ylabel('survival')
+    plt.xlabel('wait time (s)')
+    plt.rcParams["axes.linewidth"] = 1.5
 
