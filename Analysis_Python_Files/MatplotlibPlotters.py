@@ -1405,7 +1405,7 @@ def singleAtomTemp(fileId,atomlocs):
     # t = np.linspace(0, 50e-3, 100)
     ax.errorbar(key1*1e-3,avgTferData1, yerr=err1,ls='none',ecolor=color1,marker = 'o',markersize = 10,markerfacecolor=color1,markeredgecolor='k',capsize=5)
     
-    ah.releaseRecaptureTemp(key1,avgTferData1,err1,tempGuess=20e-6,
+    T, errlow, errhigh = ah.releaseRecaptureTemp(key1,avgTferData1,err1,tempGuess=20e-6,
                             trapDepth=1e-3,rrange=(1e-6,200e-6,0.2e-6),color=color1)
     
     # plt.legend(bbox_to_anchor=(.6, 1.001), ncol = 2,prop={'size': 15},frameon=False)
@@ -1415,4 +1415,4 @@ def singleAtomTemp(fileId,atomlocs):
     plt.ylabel('survival')
     plt.xlabel('wait time (s)')
     plt.rcParams["axes.linewidth"] = 1.5
-
+    return T, errlow, errhigh
