@@ -408,7 +408,7 @@ def getInitCalData():
 #         print('\033[1m' + dailycal_data + '\033[0m')
 #     return sCalData
 
-def std_analyzeAll_singleAtom(sCalData = getInitCalData(), displayResults=True, atomLocations=[2,11,1,1,1]):
+def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocations=[2,11,1,1,1]):
     allErrs, allFigs = [],[]
     analysis_names = ["MOT_NUMBER", "MOT_TEMPERATURE", "RED_PGC_TEMPERATURE",
                     "BASIC_SINGLE_ATOMS","SINLGE_ATOM_TEMP", "PUSHOUT_TEST",
