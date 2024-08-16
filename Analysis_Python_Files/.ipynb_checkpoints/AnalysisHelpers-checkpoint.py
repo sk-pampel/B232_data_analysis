@@ -2394,7 +2394,7 @@ def get_root(_f, y0, xbound0, xbound1):
     root = brentq(_f_offset, xbound0, xbound1, disp=False)
     return root
 
-def releaseRecaptureTemp(xData,survivalData,errorBars,tempGuess=60e-6,trapDepth=1e-3,rrange=(30e-6,100e-6,0.2e-6),last_index=6,color='tab:orange'):
+def releaseRecaptureTemp(xData,survivalData,errorBars,tempGuess=60e-6,trapDepth=1e-3,rrange=(30e-6,100e-6,0.2e-6),last_index=6,color='tab:orange',plot=False):
     surv = survivalData[0:last_index]
     surv_unc = [np.mean([up,lo]) for (up,lo) in zip(errorBars[0][0:len(surv)],errorBars[1][0:len(surv)])]
     x_axis = xData[0:len(surv)]
@@ -2414,8 +2414,9 @@ def releaseRecaptureTemp(xData,survivalData,errorBars,tempGuess=60e-6,trapDepth=
     loss_mins=loss_min
     # print(grid_min, grid_min_err_low, grid_min_err_high, loss_min)
     times= np.linspace(0, xData[-1]*1e-3, 50)
-    plt.plot(times, get_survival_release_capture(times, 
-            popt_min, initial_survival=init_surv, tweezer_depth=trap_depth),color=color, 
-            label= f"T = {popt_min*1e6:.2f} +{high_err*1e6:.0f}/-{low_err*1e6:.0f} uK")
+    if plot:
+        plt.plot(times, get_survival_release_capture(times, 
+                popt_min, initial_survival=init_surv, tweezer_depth=trap_depth),color=color, 
+                label= f"T = {popt_min*1e6:.2f} +{high_err*1e6:.0f}/-{low_err*1e6:.0f} uK")
     return popt_min,high_err,low_err
         

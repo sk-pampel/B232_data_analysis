@@ -15,7 +15,8 @@ import scipy.constants as const
 from . import MainAnalysis as ma
 from . import TransferAnalysis
 from . import Miscellaneous as misc
-
+import warnings
+warnings.filterwarnings("ignore", "Locator attempting to generate")
 from .MainAnalysis import analyzeNiawgWave, standardAssemblyAnalysis, AnalyzeRearrangeMoves
 from .LoadingFunctions import loadDataRay, loadCompoundBasler, loadDetailedKey
 from .AnalysisHelpers import (processSingleImage, orderData,
@@ -1384,7 +1385,7 @@ def showPics(data, key, fitParams=None, indvColorBars=False, colorMax=-1, fancy=
         picCount += 1
     return fig
 
-def singleAtomTemp(fileId,atomlocs):
+def singleAtomTemp(fileId,atomlocs,plot=True,color1='tab:green'):
     dataset1 = TransferAnalysis.standardTransferAnalysis(fileId, tao.getStandardSurvivalOptions(atomlocs));
     (tferAtomsVarAvg, tferAtomsVarErrs, loadAtomsVarAvg, initPicCounts, keyName, key1, repetitions, initThresholds, 
                 fits, avgTferData1, avgTferErr1, avgFit, avgPics, genAvgs, genErrs, tferVarAvg, tferVarErr, initAtomImages, 
@@ -1400,19 +1401,58 @@ def singleAtomTemp(fileId,atomlocs):
         upperbound.append(up)  
         lowerbound.append(lo)
     err1= [upperbound,lowerbound]   
+    if plot:
+        fig, ax = plt.subplots(figsize=(15, 6))
+        # t = np.linspace(0, 50e-3, 100)
+        ax.errorbar(key1*1e-3,avgTferData1, yerr=err1,ls='none',ecolor=color1,marker = 'o',markersize = 10,markerfacecolor=color1,markeredgecolor='k',capsize=5)
+        
+        T, errlow, errhigh = ah.releaseRecaptureTemp(key1,avgTferData1,err1,tempGuess=20e-6,
+                                trapDepth=1e-3,rrange=(1e-6,200e-6,0.2e-6),color=color1,plot=True)
+        
+        # plt.legend(bbox_to_anchor=(.6, 1.001), ncol = 2,prop={'size': 15},frameon=False)
+        plt.legend(loc=1, ncol = 2,prop={'size': 12})
+        plt.ylim(0,1)
+        # plt.xlim(0,.02)
+        plt.ylabel('survival')
+        plt.xlabel('wait time (s)')
+        plt.rcParams["axes.linewidth"] = 1.5
+    return fig, T, errlow, errhigh
+
+# import matplotlib.pyplot as plt
+
+# def singleAtomTemp(fileId, atomlocs, plot=True,color1='tab:green'):
+#     dataset1 = TransferAnalysis.standardTransferAnalysis(fileId, tao.getStandardSurvivalOptions(atomlocs))
+#     (tferAtomsVarAvg, tferAtomsVarErrs, loadAtomsVarAvg, initPicCounts, keyName, key1, repetitions, initThresholds, 
+#                 fits, avgTferData1, avgTferErr1, avgFit, avgPics, genAvgs, genErrs, tferVarAvg, tferVarErr, initAtomImages, 
+#                 tferAtomImages, tferPicCounts, tferThresholds, fitModules, basicInfoStr, ensembleHits, tOptions, analysisOpts,
+#                 tferAtomsPs, tferAtomsPs, tferList, isAnnotated, hmm) = dataset1
     
-    fig, ax = plt.subplots(figsize=(15, 6))
-    # t = np.linspace(0, 50e-3, 100)
-    ax.errorbar(key1*1e-3,avgTferData1, yerr=err1,ls='none',ecolor=color1,marker = 'o',markersize = 10,markerfacecolor=color1,markeredgecolor='k',capsize=5)
+#     upperbound = []
+#     lowerbound = []
+#     for i in np.arange(0, len(avgTferErr1)):
+#         up = avgTferErr1[i][0]
+#         lo = avgTferErr1[i][1]
+#         upperbound.append(up)  
+#         lowerbound.append(lo)
+#     err1 = [upperbound, lowerbound]   
     
-    T, errlow, errhigh = ah.releaseRecaptureTemp(key1,avgTferData1,err1,tempGuess=20e-6,
-                            trapDepth=1e-3,rrange=(1e-6,200e-6,0.2e-6),color=color1)
+#     fig = None  # Initialize fig as None
     
-    # plt.legend(bbox_to_anchor=(.6, 1.001), ncol = 2,prop={'size': 15},frameon=False)
-    plt.legend(loc=1, ncol = 2,prop={'size': 12})
-    plt.ylim(0,1)
-    # plt.xlim(0,.02)
-    plt.ylabel('survival')
-    plt.xlabel('wait time (s)')
-    plt.rcParams["axes.linewidth"] = 1.5
-    return T, errlow, errhigh
+#     if plot:
+#         fig, ax = plt.subplots(figsize=(15, 6))
+#         ax.errorbar(key1 * 1e-3, avgTferData1, yerr=err1, ls='none', ecolor=color1, marker='o',
+#                     markersize=10, markerfacecolor=color1, markeredgecolor='k', capsize=5)
+        
+#         T, errlow, errhigh = ah.releaseRecaptureTemp(key1, avgTferData1, err1, tempGuess=20e-6,
+#                                 trapDepth=1e-3, rrange=(1e-6, 200e-6, 0.2e-6), color=color1, plot=True)
+        
+#         plt.legend(loc=1, ncol=2, prop={'size': 12})
+#         plt.ylim(0, 1)
+#         plt.ylabel('survival')
+#         plt.xlabel('wait time (s)')
+#         plt.rcParams["axes.linewidth"] = 1.5
+#     else:
+#         T, errlow, errhigh = ah.releaseRecaptureTemp(key1, avgTferData1, err1, tempGuess=20e-6,
+#                                 trapDepth=1e-3, rrange=(1e-6, 200e-6, 0.2e-6), color=color1, plot=False)
+    
+#     return fig, T, errlow, errhigh

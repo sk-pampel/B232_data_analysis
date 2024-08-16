@@ -107,11 +107,17 @@ def std_MOT_NUMBER(calData):
         raise ValueError('BAD DATA!!!!')
     return calData, [res[-1]]
 
-def std_BASIC_SINGLE_ATOMS(calData, atomLocations=[2,2,3,7,1]):
+def std_SINGLE_ATOM_LOADING(calData, atomLocations=[2,2,3,7,1]):
     res = mp.Survival("BASIC_SINGLE_ATOMS", atomLocations, forceNoAnnotation=True);
     dt = exp.getStartDatetime("BASIC_SINGLE_ATOMS")
     avgVals = [np.mean(vals) for vals in misc.transpose(res['Initial_Populations'])]
     calData['Loading'] = ca.calPoint(np.max(avgVals), np.std(misc.transpose(res['Initial_Populations'])[np.argmax(avgVals)]),dt)
+    return calData, res['Figures']
+
+def std_SINGLE_ATOM_SURVIVAL(calData, atomLocations=[2,2,3,7,1]):
+    res = mp.Loading("BASIC_SINGLE_ATOMS", atomLocations, forceNoAnnotation=True);
+    dt = exp.getStartDatetime("BASIC_SINGLE_ATOMS")
+    avgVals = [np.mean(vals) for vals in misc.transpose(res['Initial_Populations'])]
     calData['ImagingSurvival'] = ca.calPoint(res['Average_Transfer'][0],res['Average_Transfer_Err'][0],dt)
     return calData, res['Figures']
 
@@ -142,16 +148,15 @@ def std_RED_PGC_TEMPERATURE_values(calData, **plotMotTempArgs):
     return calData, res[-1]
 
 def std_SINGLE_ATOM_TEMP(calData,atomLocations=[2,2,3,7,1]):
-    res = mp.Survival("SINGLE_ATOM_TEMP",atomLocations,forceNoAnnotation=True);    
-    vals = mp.singleAtomTemp("SINGLE_ATOM_TEMP",atomLocations);
+    res = mp.singleAtomTemp("SINGLE_ATOM_TEMP",atomLocations,plot=True);
     dt = exp.getStartDatetime("SINGLE_ATOM_TEMP")
-    calData['AtomTemp'] = [vals[0], (vals[1], vals[2])]
-    return calData, res['Figures']
+    calData['AtomTemp'] = [res[1], (res[2], res[3])]
+    return calData, [res[0]]
   
 def std_PUSHOUT(calData,atomLocations=[2,2,3,7,1]):
     res = mp.Survival("PUSHOUT_TEST",atomLocations,forceNoAnnotation=True);
     dt = exp.getStartDatetime("PUSHOUT_TEST")
-    calData['Pushout'] = [res[0]]
+    calData['Pushout'] = res['Average_Transfer'][-1],res['Average_Transfer_Err'][0][0],res['Average_Transfer_Err'][0][1]
     return calData, res['Figures']
     
 def std_GREY_MOLASSES_TEMPERATURE(calData, **plotMotTempArgs):
@@ -246,7 +251,8 @@ def std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values(calData, atomLocations=[2,2
     dt = exp.getStartDatetime("3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY")
     fvals = res['Average_Transfer_Fit']['vals']
     ferrs = res['Average_Transfer_Fit']['errs']
-    calData['RadialTrapFreq'] = ca.calPoint((fvals[-2]-fvals[2])/2, np.sqrt(ferrs[-2]**2/4+ferrs[2]**2/4), dt) 
+    # calData['RadialTrapFreq'] = ca.calPoint((fvals[-2]-fvals[2])/2, np.sqrt(ferrs[-2]**2/4+ferrs[2]**2/4), dt) 
+    calData['RadialTrapFreq'] = (fvals[-2]-fvals[2])/2, np.sqrt(ferrs[-2]**2/4+ferrs[2]**2/4)
     calData['RadialNbar'] = [bump2.fitCharacter(fvals), bump2.fitCharacterErr(fvals, ferrs)] 
     if calData["AxialTrapFreq"] is not None:
         nur = calData["RadialTrapFreq"].value
@@ -318,104 +324,20 @@ def std_LIFETIME_MEASUREMENT_values(calData, atomLocations=[2,2,3,7,1]):
 def getInitCalData():
     ea = None
     return {"Loading":ea,"ImagingSurvival":ea,"MOT_Size":ea,"MOT_FillTime":ea, "MOT_Temperature":ea,
-           "RPGC_Temperature":ea,"LGM_Temperature":ea,"ThermalTrapFreq":ea, "ThermalNbar":ea, "AtomTemp":ea, 
+           "RPGC_Temperature":ea,"LGM_Temperature":ea,"ThermalTrapFreq":ea, "ThermalNbar":ea, "AtomTemp":ea,"Pushout":ea, 
            "AxialTrapFreq":ea, "AxialCarrierLocation":ea, "AxialNbar":ea, "RadialTrapFreq":ea,
            "RadialNbar":ea, "RadialCarrierLocation":ea, "DeepScatteringResonance":ea, "DeepDepth":ea, 
            "ShallowScatteringResonance":ea, "ShallowDepth":ea, "ResonanceDelta":ea, "SpotSize2Freqs":ea, 
            "SpotSizeRadialDepth":ea, "SpotSizeAxDepth":ea, "RamanDepth":ea, "ResonanceDepthDelta":ea, "LifeTime":ea }    
 
-# def std_analyzeAll_check(sCalData = getInitCalData(), displayResults=True, atomLocations=[2,2,3,7,1]):
-#     allErrs, allFigs = [],[]
-#     analysis_names = ["MOT_NUMBER", "MOT_TEMPERATURE", "RED_PGC_TEMPERATURE", "GREY_MOLASSES_TEMPERATURE",
-#                     "BASIC_SINGLE_ATOMS","3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY",
-#                     "THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY","3DSBC_AXIAL_RAMAN_SPECTROSCOPY",
-#                      "3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY","DEPTH_MEASUREMENT_DEEP","DEPTH_MEASUREMENT_SHALLOW",
-#                     "LIFETIME_MEASUREMENT"]
-#     for std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE, std_RED_PGC_TEMPERATURE, std_GREY_MOLASSES_TEMPERATURE,
-#                     std_BASIC_SINGLE_ATOMS,std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
-#                     std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY,std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY,
-#                      std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY,std_DEPTH_MEASUREMENT_DEEP,std_DEPTH_MEASUREMENT_SHALLOW,std_LIFETIME_MEASUREMENT]:
-#         try:
-#             if std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE, std_RED_PGC_TEMPERATURE, std_GREY_MOLASSES_TEMPERATURE]:
-#                 sCalData, figures = std_func(sCalData)
-   
-#             else:
-#                 sCalData, figures = std_func(sCalData, atomLocations)
-#             for fig in figures:
-#                 plt.close(fig)
-#             allFigs.append(figures)
-#             allErrs.append(None)
-#         except Exception as error:
-#             print("Failed to do calibration: ", std_func, error)
-#             allFigs.append([])
-#             allErrs.append(error)
-#     IPython.display.clear_output()
-#     if displayResults:
-#         assert(len(analysis_names) == len(allFigs))
-#         for name, figs, err in zip(analysis_names, allFigs, allErrs):
-#             IPython.display.display(IPython.display.Markdown('### ' + name))
-#             for fig in figs:
-#                 IPython.display.display(fig)
-#             if err is not None:
-#                 print(err)
-#     return sCalData
-
-# def std_analyzeAll_values(sCalData = getInitCalData(), displayResults=True, atomLocations=[2,2,3,7,1]):
-#     allErrs, allFigs = [],[]
-#     analysis_names = ["MOT_NUMBER", "MOT_TEMPERATURE", "RED_PGC_TEMPERATURE", "GREY_MOLASSES_TEMPERATURE",
-#                     "BASIC_SINGLE_ATOMS","3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY",
-#                     "THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY","3DSBC_AXIAL_RAMAN_SPECTROSCOPY",
-#                      "3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY","DEPTH_MEASUREMENT_DEEP","DEPTH_MEASUREMENT_SHALLOW",
-#                     "LIFETIME_MEASUREMENT"]
-#     for std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE_values, std_RED_PGC_TEMPERATURE_values, std_GREY_MOLASSES_TEMPERATURE_values,
-#                     std_BASIC_SINGLE_ATOMS,std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
-#                     std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values,std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY_values,
-#                      std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values,std_DEPTH_MEASUREMENT_DEEP,std_DEPTH_MEASUREMENT_SHALLOW,std_LIFETIME_MEASUREMENT_values]:
-#         try:
-#             if std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE_values, std_RED_PGC_TEMPERATURE_values, std_GREY_MOLASSES_TEMPERATURE_values]:
-#                 sCalData, figures = std_func(sCalData)
-   
-#             else:
-#                 sCalData, figures = std_func(sCalData, atomLocations)
-#             for fig in figures:
-#                 plt.close(fig)
-#             allFigs.append(figures)
-#             allErrs.append(None)
-#         except Exception as error:
-#             print("Failed to do calibration: ", std_func, error)
-#             allFigs.append([])
-#             allErrs.append(error)
-        
-#         with open('dailycal_data.txt','w') as file:
-#             print("MOT temp =", sCalData['MOT_Temperature'], file=file)            
-#             print("PGC temp =", sCalData['RPGC_Temperature'], file=file)
-#             print("LGM temp =", sCalData['LGM_Temperature'], file=file)
-#             print("Thermal Nbar =",sCalData['ThermalNbar'], file=file)           
-#             print("Radial Nbar =",sCalData['RadialNbar'], file=file)
-#             print("Axial Nbar =",sCalData['AxialNbar'], file=file)
-#             print("Lifetime =",sCalData['LifeTime'], file=file)
-#     IPython.display.clear_output()
-#     if displayResults:
-#         assert(len(analysis_names) == len(allFigs))
-#         for name, figs, err in zip(analysis_names, allFigs, allErrs):
-#             IPython.display.display(IPython.display.Markdown('### ' + name))
-#             for fig in figs:
-#                 IPython.display.display(fig)
-#             if err is not None:
-#                 print(err)
-#     with open('dailycal_data.txt') as f:
-#         dailycal_data = f.read()
-#         print('\033[1m' + dailycal_data + '\033[0m')
-#     return sCalData
-
 def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocations=[2,11,1,1,1]):
     allErrs, allFigs = [],[]
-    analysis_names = ["MOT_NUMBER", "MOT_TEMPERATURE", "RED_PGC_TEMPERATURE",
-                    "BASIC_SINGLE_ATOMS","SINLGE_ATOM_TEMP", "PUSHOUT_TEST",
+    analysis_names = ["MOT_TEMPERATURE", "RED_PGC_TEMPERATURE",
+                    "BASIC_SINGLE_ATOMS","BASIC_SINGLE_ATOMS","SINLGE_ATOM_TEMP", "PUSHOUT_TEST",
                       "3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY","THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY",
                      "3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY"]
-    for std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE_values, std_RED_PGC_TEMPERATURE_values,
-                    std_BASIC_SINGLE_ATOMS,std_SINGLE_ATOM_TEMP, std_PUSHOUT, std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
+    for std_func in [std_MOT_TEMPERATURE_values, std_RED_PGC_TEMPERATURE_values,
+                    std_SINGLE_ATOM_LOADING,std_SINGLE_ATOM_SURVIVAL, std_SINGLE_ATOM_TEMP, std_PUSHOUT, std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
                     std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values, std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values]:
         try:
             if std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE_values, std_RED_PGC_TEMPERATURE_values]:
@@ -435,8 +357,10 @@ def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocatio
             print("MOT temp =", sCalData['MOT_Temperature'], file=file)            
             print("PGC temp =", sCalData['RPGC_Temperature'], file=file)
             print("atom temp =", sCalData['AtomTemp'], file=file)
+            print("F=2 Population=", sCalData['Pushout'],file=file)
             print("Thermal Nbar =",sCalData['ThermalNbar'], file=file)           
             print("Radial Nbar =",sCalData['RadialNbar'], file=file)
+            print("Radial Trap frequency =",sCalData['RadialTrapFreq'], file=file)
     IPython.display.clear_output()
     if displayResults:
         assert(len(analysis_names) == len(allFigs))
@@ -449,7 +373,7 @@ def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocatio
     with open('dailycal_data.txt') as f:
         dailycal_data = f.read()
         print('\033[1m' + dailycal_data + '\033[0m')
-    return sCalData
+    # return sCalData
 
 def plotCalData(ax, dataV, pltargs={}, sf=1):
     err = np.array(np.array([data.error for data in dataV]).tolist())
