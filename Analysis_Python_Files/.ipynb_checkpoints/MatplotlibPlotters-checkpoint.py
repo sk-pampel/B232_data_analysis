@@ -16,7 +16,13 @@ from . import MainAnalysis as ma
 from . import TransferAnalysis
 from . import Miscellaneous as misc
 import warnings
+warnings.filterwarnings("ignore", message=".*Locator attempting to generate.*")
 warnings.filterwarnings("ignore", "Locator attempting to generate")
+warnings.filterwarnings("ignore")
+import matplotlib.ticker as ticker
+
+# Increase the MAXTICKS limit for the default locator
+ticker.MaxNLocator.MAXTICKS = 10000  
 from .MainAnalysis import analyzeNiawgWave, standardAssemblyAnalysis, AnalyzeRearrangeMoves
 from .LoadingFunctions import loadDataRay, loadCompoundBasler, loadDetailedKey
 from .AnalysisHelpers import (processSingleImage, orderData,
@@ -102,7 +108,7 @@ def fancyImshow( fig, ax, image, avgSize='20%', pad_=0, cb=True, imageArgs={}, h
     """
     fig.subplots_adjust(**subplotsAdjustArgs)
     im = ax.imshow(image, **imageArgs)
-    ax.grid(False)
+    # ax.grid(False)
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     #ax.axis('off')
@@ -451,7 +457,7 @@ def singleImage(data, accumulations=1, loadType='andor', bg=arr([0]), title='Sin
             maxColor = max(rawData.flatten())
         imshow(rawData, extent=(min(xPts), max(xPts), max(yPts), min(yPts)), vmax=maxColor)
     colorbar()
-    grid(False)
+    # grid(False)
     return rawData, dataMinusBg
 
 
@@ -665,6 +671,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
     """
     avgColor='k'
     tt = TimeTracker()
+    print('debug')
     if resInput is None:
         try:
             res = TransferAnalysis.standardTransferAnalysis( fileNumber, anaylsisOpts, fitModules=fitModules, 
@@ -685,7 +692,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
      fits, avgTransferData, avgTransferErr, avgFit, avgPics, genAvgs, genErrs, transVarAvg, transVarErr, 
      initAtomImages, transAtomImages, pic2Data, transThresholds, fitModules, basicInfoStr, ensembleHits, 
      tOptions, analysisOpts, initAtoms, tferAtoms, tferList, isAnnotated, condHitList) = res
-    print('keys:',keyName)
+    print('keys:',keyName,key)
     if flattenKeyDim != None:
         key = key[:,flattenKeyDim]
     showImagePlots = showImagePlots if showImagePlots is not None else (False if analysisOpts.numAtoms() == 1 else True)
@@ -742,6 +749,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
     fontsizes = [20,10,10,10,10]
     for pltNum, (subplt, xlbl, ylbl, title, yTickMaj, yTickMin, xTickMaj, fs, grid) in \
                 enumerate(zip(plotList, xlabels, ylabels, titles, majorYTicks, minorYTicks, majorXTicks, fontsizes, grid_options)):
+        print('yTickMaj',yTickMaj)
         subplt.set_xlabel(xlbl, fontsize=fs)
         subplt.set_ylabel(ylbl, fontsize=fs)
         subplt.set_title(title, fontsize=fs, loc='left', pad=50 if pltNum==0 else 0)
@@ -782,6 +790,9 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
             leg += ps.name +','
         leg += ")"
         unevenErrs = [[abs(err[0]) for err in transferErrs[dataSetInc]], [abs(err[1]) for err in transferErrs[dataSetInc]]]
+        mainPlot.set_xticks([])
+        mainPlot.set_xlim(min(key), max(key))
+        # print('test',key)
         mainPlot.errorbar ( key, transferData[dataSetInc], yerr=unevenErrs, color=color, ls='',
                             capsize=6, elinewidth=3, label=leg, 
                            alpha=0.3 if plotAvg else 0.9, marker=markers[dataSetInc%len(markers)], markersize=15)
@@ -1166,8 +1177,11 @@ def Population(fileNum, atomLocations, whichPic, picsPerRep, plotLoadingRate=Tru
                               + (max(key) - min(key)) / len(key))
         if len(key) < 30:
             mainPlot.set_xticks(key)
+            mainPlot.set_xlim(min(key), max(key))
         else:
-            mainPlot.set_xticks(np.linspace(min(key),max(key),30))
+            # mainPlot.set_xticks(np.linspace(min(key),max(key),30))
+            mainPlot.set_xticks(key)
+            # mainPlot.set_xlim(min(key), max(key))
         rotateTicks(mainPlot)
         titletxt = keyName + " Atom " + typeName + " Scan"
         if len(allPops[0]) == 1:
@@ -1218,7 +1232,9 @@ def Population(fileNum, atomLocations, whichPic, picsPerRep, plotLoadingRate=Tru
         item.set_fontsize(10)
     countPlot.set_xlim((0, len(locCounts[0])))
     tickVals = np.linspace(0, len(locCounts[0]), len(key) + 1)
-    countPlot.set_xticks(tickVals[0:-1:2])
+    # countPlot.set_xticks(tickVals[0:-1:2])
+    countPlot.mainPlot.set_xticks(key)
+
     # Count Histogram Plot
     for i, atomLoc in enumerate(atomLocations):
         if histMain:
@@ -1237,7 +1253,7 @@ def Population(fileNum, atomLocations, whichPic, picsPerRep, plotLoadingRate=Tru
     avgPlt.imshow(avgPic, origin='lower');
     avgPlt.set_xticks([]) 
     avgPlt.set_yticks([])
-    avgPlt.grid(False)
+    # avgPlt.grid(False)
     for loc in atomLocations:
         circ = Circle((loc[1], loc[0]), 0.2, color='r')
         avgPlt.add_artist(circ)
