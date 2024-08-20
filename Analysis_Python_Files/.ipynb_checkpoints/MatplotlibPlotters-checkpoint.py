@@ -749,7 +749,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
         subplt.set_yticks(yTickMin, minor=True)
         if exactTicks == False:
             xTicks = np.linspace(min(key),max(key),len(key))
-            print('key',key)
+            print('key test',key)
         else:
             subplt.set_xticks(xTickMaj)
         rotateTicks(subplt)
