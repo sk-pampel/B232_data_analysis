@@ -174,7 +174,7 @@ def std_GREY_MOLASSES_TEMPERATURE_values(calData, **plotMotTempArgs):
     return calData, res[-1]
 
 def std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1]):
-    res = mp.Survival( "3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY", atomLocations, fitModules=[bump], forceNoAnnotation=True);
+    res = mp.Survival( "3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY", atomLocations,exactTicks=False, fitModules=[bump], forceNoAnnotation=True);
     dt = exp.getStartDatetime("3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY")
     fit = res['Average_Transfer_Fit']
     if np.isinf(fit['errs'][1]) or np.isnan(fit['errs'][1]):

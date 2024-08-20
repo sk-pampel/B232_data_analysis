@@ -652,11 +652,11 @@ def Tunneling( fileID, tunnelPair1Locs, tunnelPair2Locs, dataColor=['#FF0000','#
 
     return res
     
-def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules=[None], 
+def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules=[None], exactTicks = True,
               showFitDetails=False, showFitCharacterPlot=False, showImagePlots=None, plotIndvHists=False, 
               timeit=False, outputThresholds=False, plotFitGuess=False, newAnnotation=False, 
               plotImagingSignal=False, expFile_version=4, plotAvg=True, countMain=False, histMain=False,
-              flattenKeyDim=None, forceNoAnnotation=False, cleanOutput=True, dataColor='gist_rainbow', dataEdgeColors=None,
+              flattenKeyDim=None, forceNoAnnotation=False, cleanOutput=True, dataColor='gist_rainbow', dataEdgeColors=None, 
               tOptions=[to.ThresholdOptions()], resInput=None, countRunningAvg=None, realUnits=None, **standardTransferArgs):
     """
     Standard data analysis function for looking at survival rates throughout an experiment. I'm very bad at keeping the 
@@ -747,7 +747,11 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
         subplt.set_title(title, fontsize=fs, loc='left', pad=50 if pltNum==0 else 0)
         subplt.set_yticks(yTickMaj)
         subplt.set_yticks(yTickMin, minor=True)
-        subplt.set_xticks(xTickMaj)
+        if exactTicks == False:
+            xTicks = np.linspace(min(key),max(key),len(key))
+            print('key',key)
+        else:
+            subplt.set_xticks(xTickMaj)
         rotateTicks(subplt)
         subplt.grid(grid, color='#909090', which='Major', linewidth=2)
         #subplt.grid(grid, color='#AAAAAA', which='Minor')
@@ -789,6 +793,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
                 mainPlot.plot(fit['x'], fit['guess'], color='r', alpha=1)
 
     mainPlot.xaxis.set_label_coords(0.95, -0.15)
+    mainPlot.set_xticks(key)
     if legendOption:
         mainPlot.legend(loc="upper right", bbox_to_anchor=(1, 1.1), fancybox=True, 
                         ncol = 4 if longLegend else 10, prop={'size': 14}, frameon=False)
