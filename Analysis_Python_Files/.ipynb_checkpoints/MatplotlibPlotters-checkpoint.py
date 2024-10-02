@@ -671,7 +671,6 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
     """
     avgColor='k'
     tt = TimeTracker()
-    print('debug')
     if resInput is None:
         try:
             res = TransferAnalysis.standardTransferAnalysis( fileNumber, anaylsisOpts, fitModules=fitModules, 
@@ -692,7 +691,7 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
      fits, avgTransferData, avgTransferErr, avgFit, avgPics, genAvgs, genErrs, transVarAvg, transVarErr, 
      initAtomImages, transAtomImages, pic2Data, transThresholds, fitModules, basicInfoStr, ensembleHits, 
      tOptions, analysisOpts, initAtoms, tferAtoms, tferList, isAnnotated, condHitList) = res
-    print('keys:',keyName,key)
+    # print('keys:',keyName,key)
     if flattenKeyDim != None:
         key = key[:,flattenKeyDim]
     showImagePlots = showImagePlots if showImagePlots is not None else (False if analysisOpts.numAtoms() == 1 else True)
@@ -749,7 +748,6 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
     fontsizes = [20,10,10,10,10]
     for pltNum, (subplt, xlbl, ylbl, title, yTickMaj, yTickMin, xTickMaj, fs, grid) in \
                 enumerate(zip(plotList, xlabels, ylabels, titles, majorYTicks, minorYTicks, majorXTicks, fontsizes, grid_options)):
-        print('yTickMaj',yTickMaj)
         subplt.set_xlabel(xlbl, fontsize=fs)
         subplt.set_ylabel(ylbl, fontsize=fs)
         subplt.set_title(title, fontsize=fs, loc='left', pad=50 if pltNum==0 else 0)
@@ -757,7 +755,6 @@ def Transfer( fileNumber, anaylsisOpts, show=True, legendOption=None, fitModules
         subplt.set_yticks(yTickMin, minor=True)
         if exactTicks == False:
             xTicks = np.linspace(min(key),max(key),len(key))
-            print('key test',key)
         else:
             subplt.set_xticks(xTickMaj)
         rotateTicks(subplt)

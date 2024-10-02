@@ -345,7 +345,7 @@ def count_potentials(energy_curves, interatomic_distance, energy_bin,plot=False)
 
 def get_hyperfine_potentials(FS,HFS): # form (D2, F23)
     filename = str(FS) + '_potentials_' + str(HFS) +'.csv'
-    filepath = '/Users/stevenpampel/Documents/B232_Data_Analysis/Molecular_Potentials/' + filename
+    filepath = '/Users/stpa0446/Library/Mobile Documents/com~apple~CloudDocs/Documents/B232_Data_Analysis/Molecular_Potentials/' + filename
     hyperfine_potential = np.loadtxt(filepath, delimiter=',', skiprows=1) 
     # hyperfine_potential = np.loadtxt('LZ_potential.csv', delimiter=',', skiprows=1)
     atomic_distances = hyperfine_potential[:, 0]
@@ -357,7 +357,7 @@ def get_hyperfine_potentials(FS,HFS): # form (D2, F23)
 
 def get_hyperfine_potentials_plot(FS,HFS): # form (D2, F23)
     filename = str(FS) + '_potentials_' + str(HFS) +'.csv'
-    filepath = '/Users/stevenpampel/Documents/B232_Data_Analysis/Molecular_Potentials/' + filename
+    filepath = '/Users/stpa0446/Library/Mobile Documents/com~apple~CloudDocs/Documents/B232_Data_Analysis/Molecular_Potentials/' + filename
     hyperfine_potential = np.loadtxt(filepath, delimiter=',', skiprows=1) 
     # hyperfine_potential = np.loadtxt('LZ_potential.csv', delimiter=',', skiprows=1)
     atomic_distances = hyperfine_potential[:, 0]
@@ -540,21 +540,6 @@ def get_deltaR(x_values, curve_data, detuning, Omega, resonance, target_distance
     
     return abs_difference
 
-def diff_eq_collisionLZ(t, r, C3_factor):
-    drdt = np.zeros(2)
-    drdt[0] = r[1]
-    drdt[1] = C3_factor * 3 * cs.Rb87_C3 / (cs.Rb87_M * r[0]**4)
-    return drdt
-
-
-def get_collisional_energyLZ(R, V, C3_factor):
-    dt = 27e-9
-    r0 = [R, -V]
-    t_span = [0, dt]
-    sol = solve_ivp(lambda t, r: diff_eq_collisionLZ(t, r, C3_factor), t_span, r0, t_eval=np.linspace(0, dt, 1000))
-    velocities = sol.y[1]
-    E_final_MHz = 3 / 8 * cs.Rb87_M * velocities[-1]**2 / cs.hbar * 1e-6
-    return E_final_MHz 
 
 def get_acceleration(distances, energy_curve, position):
     # Calculate acceleration based on the energy curve
@@ -600,59 +585,10 @@ def get_collisional_energy(distances, energy_curve, initial_position, initial_ve
         else:
             return V_final,dt_eff
 
-def jeffreyInterval(m,num,alpha):
-    # sigma = 1-0.6827 gives the standard "1 sigma" intervals.
-    i1, i2 = confidenceInterval(round(m*num), num, method='jeffreys',alpha=alpha) # alpha=1-0.6827)
-    return (m - i1, i2 - m)
-
-def getCollisionStats(tferList,alpha):
-    # Take the previous data, which includes entries when there was no atom in the first picture, and convert it to
-    # an array of just loaded and survived or loaded and died.
-    transferErrors = np.zeros([2])
-    tferVarList = np.array([x for x in tferList if x != -1])
-    if tferVarList.size == 0:
-        # catch the case where there's no relevant data, typically if laser becomes unlocked.
-        transferErrors = [0,0]
-        transferAverages = 0
-    else:
-        # normal case
-        transferAverages = np.average(tferVarList)
-        transferErrors = jeffreyInterval(transferAverages, len(tferVarList),alpha)
-    return transferAverages, transferErrors
-
-# def effective_lifetime(mu, I_0, delta_nu, Gamma_0,alpha=1):
-#     """
-#     Calculate the effective lifetime of an excited state considering stimulated emission.
-    
-#     Parameters:
-#     tau_0 (float): Natural lifetime of the excited state (in seconds)
-#     mu (float): Transition dipole moment (in Coulomb-meters)
-#     I_nu (float): Intensity of the incident radiation (in W/m^2/Hz)
-#     delta_nu (float): Detuning from resonance (in Hz)
-#     gamma (float): Natural linewidth (FWHM) of the transition (in Hz)
-    
-#     Returns:
-#     float: Effective lifetime of the excited state (in seconds)
-#     """
-    
-#     # Spontaneous emission rate
-    
-#     I = I_0*1/((2*delta_nu/Gamma_0)**2+1)
-    
-#     # Stimulated emission term
-#     Gamma_stim = alpha*(mu**2 * I) / (6 * cs.epsilon0 * cs.hbar**2 * cs.c) * (1 / (1 + (2 * delta_nu / Gamma_0)**2))
-    
-#     # Total emission rate
-#     Gamma_eff = Gamma_0 + Gamma_stim
-    
-#     # Effective lifetime
-#     tau_eff = 1 / Gamma_eff
-    
-#     return tau_eff
 
 def effective_lifetime(mu,I_0, I_sat, delta, Gamma_0,alpha=1):
     # Define the constant A
-    A = (np.pi*mu**2) / (3*cs.c*cs.hbar**2*cs.epsilon0) 
+    A = (np.pi**2*mu**2) / (cs.c*cs.hbar**2*cs.epsilon0) 
     I_w = I_0/np.pi*((Gamma_0/2)/((delta)**2+(Gamma_0/2)**2))
     Gamma_stim = alpha*A*(I_w/(1+I_w/I_sat))     
     Gamma_eff = 2*Gamma_0 + Gamma_stim

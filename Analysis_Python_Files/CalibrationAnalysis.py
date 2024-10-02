@@ -127,7 +127,7 @@ def std_MOT_TEMPERATURE(calData, **plotMotTempArgs):
     calData['MOT_Temperature'] = ca.calPoint(res[2], res[3], dt)
     return calData, res[-1]
 
-def std_MOT_TEMPERATURE_values(calData, **plotMotTempArgs):
+def std_MOT_TEMPERATURE(calData, **plotMotTempArgs):
     res = mp.plotMotTemperature('MOT_TEMPERATURE', reps=15, fitWidthGuess=15, **plotMotTempArgs);
     dt = exp.getStartDatetime("MOT_TEMPERATURE")
     calData['MOT_Temperature'] = [res[2], (res[3])]
@@ -140,7 +140,7 @@ def std_RED_PGC_TEMPERATURE(calData, **plotMotTempArgs):
     calData['RPGC_Temperature'] = ca.calPoint(res[2], res[3], dt)
     return calData, res[-1]
 
-def std_RED_PGC_TEMPERATURE_values(calData, **plotMotTempArgs):
+def std_RED_PGC_TEMPERATURE(calData, **plotMotTempArgs):
     res = mp.plotMotTemperature('RED_PGC_TEMPERATURE', reps=15, fitWidthGuess=3, temperatureGuess=20e-6,
                                 **plotMotTempArgs);
     dt = exp.getStartDatetime("RED_PGC_TEMPERATURE")
@@ -150,7 +150,7 @@ def std_RED_PGC_TEMPERATURE_values(calData, **plotMotTempArgs):
 def std_SINGLE_ATOM_TEMP(calData,atomLocations=[2,2,3,7,1]):
     res = mp.singleAtomTemp("SINGLE_ATOM_TEMP",atomLocations,plot=True);
     dt = exp.getStartDatetime("SINGLE_ATOM_TEMP")
-    calData['AtomTemp'] = [res[1], (res[2], res[3])]
+    calData['AtomTemp'] = [res[1]*1e6, (res[2]*1e6, res[3]*1e6)]
     return calData, [res[0]]
   
 def std_PUSHOUT(calData,atomLocations=[2,2,3,7,1]):
@@ -158,7 +158,17 @@ def std_PUSHOUT(calData,atomLocations=[2,2,3,7,1]):
     dt = exp.getStartDatetime("PUSHOUT_TEST")
     calData['Pushout'] = res['Average_Transfer'][-1],res['Average_Transfer_Err'][0][0],res['Average_Transfer_Err'][0][1]
     return calData, res['Figures']
-    
+
+def std_LR_QUANT_AXIS(calData, atomLocations=[2,2,3,7,1]):
+    res = mp.Survival( "LR_FIELD_TEST", atomLocations,exactTicks=False, fitModules=[bump], forceNoAnnotation=True);
+    dt = exp.getStartDatetime("LR_FIELD_TEST")
+    fit = res['Average_Transfer_Fit']
+    if np.isinf(fit['errs'][1]) or np.isnan(fit['errs'][1]):
+        print('BAD Field SCAN!')
+    else:
+        calData['LR_Field_peak_Location'] = (fit['vals'][1], fit['errs'][1]) 
+    return calData, res['Figures']
+
 def std_GREY_MOLASSES_TEMPERATURE(calData, **plotMotTempArgs):
     res = mp.plotMotTemperature('GREY_MOLASSES_TEMPERATURE', reps=15, fitWidthGuess=20, lastDataIsBackground=True, temperatureGuess=20e-6,
                                 **plotMotTempArgs);
@@ -166,7 +176,7 @@ def std_GREY_MOLASSES_TEMPERATURE(calData, **plotMotTempArgs):
     calData['LGM_Temperature'] = ca.calPoint(res[2], res[3], dt)
     return calData, res[-1]
 
-def std_GREY_MOLASSES_TEMPERATURE_values(calData, **plotMotTempArgs):
+def std_GREY_MOLASSES_TEMPERATURE(calData, **plotMotTempArgs):
     res = mp.plotMotTemperature('GREY_MOLASSES_TEMPERATURE', reps=15, fitWidthGuess=20, lastDataIsBackground=True, temperatureGuess=20e-6,
                                 **plotMotTempArgs);
     dt = exp.getStartDatetime("GREY_MOLASSES_TEMPERATURE")
@@ -183,17 +193,8 @@ def std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1])
         calData['RadialCarrierLocation'] = ca.calPoint(fit['vals'][1], fit['errs'][1], dt) 
     return calData, res['Figures']
 
-def std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1]):
-    res = mp.Survival( "THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY", atomLocations, 
-                       forceNoAnnotation=True, fitModules=[bump2], 
-                       fitguess=[[0,0.3,-150,10, 0.3, 150, 10]]);
-    dt = exp.getStartDatetime("THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY")
-    fit = res['Average_Transfer_Fit']
-    calData['ThermalTrapFreq'] = ca.calPoint((fit['vals'][-2] - fit['vals'][2]) / 2, np.sqrt(fit['errs'][-2]**2/4+fit['errs'][2]**2/4), dt) 
-    calData['ThermalNbar'] = ca.calPoint((bump2.fitCharacter(fit['vals'])), (bump2.fitCharacterErr(fit['vals'], fit['errs'])), dt)
-    return calData, res['Figures']
 
-def std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values(calData, atomLocations=[2,2,3,7,1]):
+def std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1]):
     res = mp.Survival( "THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY", atomLocations, 
                        forceNoAnnotation=True, fitModules=[bump2], 
                        fitguess=[[0,0.3,-150,10, 0.3, 150, 10]]);
@@ -202,6 +203,17 @@ def std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values(calData, atomLocations=[2
     calData['ThermalTrapFreq'] = ca.calPoint((fit['vals'][-2] - fit['vals'][2]) / 2, np.sqrt(fit['errs'][-2]**2/4+fit['errs'][2]**2/4), dt) 
     calData['ThermalNbar'] = [bump2.fitCharacter(fit['vals']), (bump2.fitCharacterErr(fit['vals'], fit['errs']))]
     return calData, res['Figures']
+
+def std_3DSBC_TOP_BSB_RABI(calData, atomLocations=[2,2,3,7,1]):
+    res = mp.Survival( "3DSBC_TOP_BSB_RABI", atomLocations,exactTicks=False, fitModules=[bump], forceNoAnnotation=True);
+    dt = exp.getStartDatetime("3DSBC_TOP_BSB_RABI")
+    fit = res['Average_Transfer_Fit']
+    if np.isinf(fit['errs'][1]) or np.isnan(fit['errs'][1]):
+        print('BAD CARRIER SCAN!')
+    else:
+        calData['RadialPiTime'] = [fit['vals'][1], fit['errs'][1]]
+    return calData, res['Figures']
+
 
 def std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1], centerGuess=None, **SurvivalArgs):
     guess=bump3_Sym.guess([],[])
@@ -212,43 +224,29 @@ def std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1], cente
     dt = exp.getStartDatetime("3DSBC_AXIAL_RAMAN_SPECTROSCOPY")
     fitV = res['Average_Transfer_Fit']['vals']
     fitE = res['Average_Transfer_Fit']['errs']
-    calData['AxialTrapFreq'] = ca.calPoint(fitV[-1]/2, fitE[-1]/2, dt) 
-    calData['AxialCarrierLocation'] = ca.calPoint(fitV[-2], fitE[-2], dt) 
-    calData['AxialNbar'] = ca.calPoint((bump3_Sym.fitCharacter(fitV)), (bump3_Sym.fitCharacterErr(fitV, fitE)), dt)
+    # calData['AxialTrapFreq'] = ca.calPoint(fitV[-1]/2, fitE[-1]/2, dt) 
+    # calData['AxialCarrierLocation'] = ca.calPoint(fitV[-2], fitE[-2], dt) 
+    calData['AxialNbar'] = [bump3_Sym.fitCharacter(fitV), (bump3_Sym.fitCharacterErr(fitV, fitE))]
     return calData, res['Figures']
 
-def std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY_values(calData, atomLocations=[2,2,3,7,1], centerGuess=None, **SurvivalArgs):
+def std_THERMAL_AXIAL_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1], centerGuess=None, **SurvivalArgs):
     guess=bump3_Sym.guess([],[])
     if centerGuess is not None:
         guess[-2] = centerGuess
-    res = mp.Survival( "3DSBC_AXIAL_RAMAN_SPECTROSCOPY", atomLocations, forceNoAnnotation=True, 
+    res = mp.Survival( "THERMAL_AXIAL_RAMAN_SPECTROSCOPY", atomLocations, forceNoAnnotation=True, 
                        fitModules=bump3_Sym, showFitDetails=False, fitguess=[guess], **SurvivalArgs);
-    dt = exp.getStartDatetime("3DSBC_AXIAL_RAMAN_SPECTROSCOPY")
+    dt = exp.getStartDatetime("THERMAL_AXIAL_RAMAN_SPECTROSCOPY")
     fitV = res['Average_Transfer_Fit']['vals']
     fitE = res['Average_Transfer_Fit']['errs']
     calData['AxialTrapFreq'] = ca.calPoint(fitV[-1]/2, fitE[-1]/2, dt) 
     calData['AxialCarrierLocation'] = ca.calPoint(fitV[-2], fitE[-2], dt) 
-    calData['AxialNbar'] = [bump3_Sym.fitCharacter(fitV), (bump3_Sym.fitCharacterErr(fitV, fitE))]
+    calData['ThermalAxialNbar'] = [bump3_Sym.fitCharacter(fitV), (bump3_Sym.fitCharacterErr(fitV, fitE))]
     return calData, res['Figures']
 
-def std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1]):
-    res = mp.Survival("3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY", atomLocations, 
+def std_3DSBC_RADIAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1]):
+    res = mp.Survival("3DSBC_RADIAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY", atomLocations, 
                       fitModules=[bump2], fitguess=[[0,0.3,-150,10, 0.3, 150, 10]], forceNoAnnotation=True);
-    dt = exp.getStartDatetime("3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY")
-    fvals = res['Average_Transfer_Fit']['vals']
-    ferrs = res['Average_Transfer_Fit']['errs']
-    calData['RadialTrapFreq'] = ca.calPoint((fvals[-2]-fvals[2])/2, np.sqrt(ferrs[-2]**2/4+ferrs[2]**2/4), dt) 
-    calData['RadialNbar'] = ca.calPoint(bump2.fitCharacter(fvals), bump2.fitCharacterErr(fvals, ferrs), dt) 
-    if calData["AxialTrapFreq"] is not None:
-        nur = calData["RadialTrapFreq"].value
-        nuax = calData["AxialTrapFreq"].value
-        calData["SpotSize2Freqs"] = ca.calPoint(ca.getWaistFromBothFreqs(nur,nuax), 0, dt)
-    return calData, res['Figures']
-
-def std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values(calData, atomLocations=[2,2,3,7,1]):
-    res = mp.Survival("3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY", atomLocations, 
-                      fitModules=[bump2], fitguess=[[0,0.3,-150,10, 0.3, 150, 10]], forceNoAnnotation=True);
-    dt = exp.getStartDatetime("3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY")
+    dt = exp.getStartDatetime("3DSBC_RADIAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY")
     fvals = res['Average_Transfer_Fit']['vals']
     ferrs = res['Average_Transfer_Fit']['errs']
     # calData['RadialTrapFreq'] = ca.calPoint((fvals[-2]-fvals[2])/2, np.sqrt(ferrs[-2]**2/4+ferrs[2]**2/4), dt) 
@@ -260,6 +258,31 @@ def std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values(calData, atomLocations=[2,2
         calData["SpotSize2Freqs"] = ca.calPoint(ca.getWaistFromBothFreqs(nur,nuax), 0, dt)
     return calData, res['Figures']
 
+def std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY(calData, atomLocations=[2,2,3,7,1]):
+    res = mp.Survival("3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY", atomLocations, 
+                      fitModules=[bump2], fitguess=[[0,0.3,-150,10, 0.3, 150, 10]], forceNoAnnotation=True);
+    dt = exp.getStartDatetime("3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY")
+    fvals = res['Average_Transfer_Fit']['vals']
+    ferrs = res['Average_Transfer_Fit']['errs']
+    # calData['RadialTrapFreq'] = ca.calPoint((fvals[-2]-fvals[2])/2, np.sqrt(ferrs[-2]**2/4+ferrs[2]**2/4), dt) 
+    calData['RadialTrapFreq'] = (fvals[-2]-fvals[2])/2, np.sqrt(ferrs[-2]**2/4+ferrs[2]**2/4)
+    calData['RadialAxialNbar'] = [bump2.fitCharacter(fvals), bump2.fitCharacterErr(fvals, ferrs)] 
+    if calData["AxialTrapFreq"] is not None:
+        nur = calData["RadialTrapFreq"].value
+        nuax = calData["AxialTrapFreq"].value
+        calData["SpotSize2Freqs"] = ca.calPoint(ca.getWaistFromBothFreqs(nur,nuax), 0, dt)
+    return calData, res['Figures']
+    
+def std_3DSBC_AXIAL_BSB_RABI(calData, atomLocations=[2,2,3,7,1]):
+    res = mp.Survival( "3DSBC_AXIAL_BSB_RABI", atomLocations,exactTicks=False, fitModules=[bump], forceNoAnnotation=True);
+    dt = exp.getStartDatetime("3DSBC_AXIAL_BSB_RABI")
+    fit = res['Average_Transfer_Fit']
+    if np.isinf(fit['errs'][1]) or np.isnan(fit['errs'][1]):
+        print('BAD CARRIER SCAN!')
+    else:
+        calData['AxialPiTime'] = [fit['vals'][1], fit['errs'][1]] 
+    return calData, res['Figures']
+    
 def std_DEPTH_MEASUREMENT_DEEP(calData, atomLocations=[2,2,3,7,1]):
     res = mp.Survival("DEPTH_MEASUREMENT_DEEP", atomLocations, fitModules=dip, forceNoAnnotation=True, showFitDetails=True);
     dt = exp.getStartDatetime("DEPTH_MEASUREMENT_DEEP")
@@ -312,7 +335,7 @@ def std_LIFETIME_MEASUREMENT(calData, atomLocations=[2,2,3,7,1]):
     calData['LifeTime'] = ca.calPoint(fit['vals'][1], fit['errs'][1], dt)
     return calData, res['Figures']
 
-def std_LIFETIME_MEASUREMENT_values(calData, atomLocations=[2,2,3,7,1]):
+def std_LIFETIME_MEASUREMENT(calData, atomLocations=[2,2,3,7,1]):
     decay.limit = 0
     res = mp.Survival("LIFETIME_MEASUREMENT", atomLocations, fitModules=decay, forceNoAnnotation=True);
     dt = exp.getStartDatetime("LIFETIME_MEASUREMENT")
@@ -324,23 +347,21 @@ def std_LIFETIME_MEASUREMENT_values(calData, atomLocations=[2,2,3,7,1]):
 def getInitCalData():
     ea = None
     return {"Loading":ea,"ImagingSurvival":ea,"MOT_Size":ea,"MOT_FillTime":ea, "MOT_Temperature":ea,
-           "RPGC_Temperature":ea,"LGM_Temperature":ea,"ThermalTrapFreq":ea, "ThermalNbar":ea, "AtomTemp":ea,"Pushout":ea, 
-           "AxialTrapFreq":ea, "AxialCarrierLocation":ea, "AxialNbar":ea, "RadialTrapFreq":ea,
-           "RadialNbar":ea, "RadialCarrierLocation":ea, "DeepScatteringResonance":ea, "DeepDepth":ea, 
+           "RPGC_Temperature":ea,"LGM_Temperature":ea,"ThermalTrapFreq":ea, "ThermalNbar":ea, "AtomTemp":ea,"Pushout":ea, "LR_Field_peak_Location":ea, "ThermalAxialNbar":ea, "AxialTrapFreq":ea, "AxialCarrierLocation":ea, "AxialNbar":ea, "RadialTrapFreq":ea,"AxialPiTime":ea,"RadialPiTime":ea,
+           "RadialNbar":ea,"RadialAxialNbar":ea,  "RadialCarrierLocation":ea, "DeepScatteringResonance":ea, "DeepDepth":ea, 
            "ShallowScatteringResonance":ea, "ShallowDepth":ea, "ResonanceDelta":ea, "SpotSize2Freqs":ea, 
            "SpotSizeRadialDepth":ea, "SpotSizeAxDepth":ea, "RamanDepth":ea, "ResonanceDepthDelta":ea, "LifeTime":ea }    
 
 def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocations=[2,11,1,1,1]):
     allErrs, allFigs = [],[]
-    analysis_names = ["MOT_TEMPERATURE", "RED_PGC_TEMPERATURE",
-                    "BASIC_SINGLE_ATOMS","BASIC_SINGLE_ATOMS","SINLGE_ATOM_TEMP", "PUSHOUT_TEST",
-                      "3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY","THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY",
-                     "3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY"]
-    for std_func in [std_MOT_TEMPERATURE_values, std_RED_PGC_TEMPERATURE_values,
-                    std_SINGLE_ATOM_LOADING,std_SINGLE_ATOM_SURVIVAL, std_SINGLE_ATOM_TEMP, std_PUSHOUT, std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
-                    std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values, std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY_values]:
+    analysis_names = ["MOT_TEMPERATURE", "RED_PGC_TEMPERATURE","BASIC_SINGLE_ATOMS","BASIC_SINGLE_ATOMS","SINLGE_ATOM_TEMP", "PUSHOUT_TEST","LR_FIELD_TEST","3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY","THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY","3DSBC_TOP_RADIAL_SIDEBAND_RAMAN_SPECTROSCOPY","3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY",
+                     "3DSBC_TOP_BSB_RABI", "THERMAL_AXIAL_RAMAN_SPECTROSCOPY","3DSBC_AXIAL_RAMAN_SPECTROSCOPY","3DSBC_AXIAL_BSB_RABI"]
+    for std_func in [std_MOT_TEMPERATURE, std_RED_PGC_TEMPERATURE,
+                    std_SINGLE_ATOM_LOADING,std_SINGLE_ATOM_SURVIVAL, std_SINGLE_ATOM_TEMP, std_PUSHOUT, std_LR_QUANT_AXIS,std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
+                    std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY,std_3DSBC_RADIAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY, std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY,std_3DSBC_TOP_BSB_RABI, std_THERMAL_AXIAL_RAMAN_SPECTROSCOPY,
+                    std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY,std_3DSBC_AXIAL_BSB_RABI]:
         try:
-            if std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE_values, std_RED_PGC_TEMPERATURE_values]:
+            if std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE, std_RED_PGC_TEMPERATURE]:
                 sCalData, figures = std_func(sCalData)
             else:
                 sCalData, figures = std_func(sCalData, atomLocations)
@@ -358,9 +379,17 @@ def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocatio
             print("PGC temp =", sCalData['RPGC_Temperature'], file=file)
             print("atom temp =", sCalData['AtomTemp'], file=file)
             print("F=2 Population=", sCalData['Pushout'],file=file)
-            print("Thermal Nbar =",sCalData['ThermalNbar'], file=file)           
-            print("Radial Nbar =",sCalData['RadialNbar'], file=file)
+            print("LR Field Value=", sCalData['LR_Field_peak_Location'],file=file)
+            print("Thermal Radial Nbar =",sCalData['ThermalNbar'], file=file)           
+            print("SBC Radial Nbar =",sCalData['RadialNbar'], file=file)
             print("Radial Trap frequency =",sCalData['RadialTrapFreq'], file=file)
+            print("Radial Pi Time =",sCalData['RadialPiTime'], file=file)            
+            print("Axial Nbar =",sCalData['ThermalAxialNbar'], file=file)
+            print("SBC Axial =",sCalData['AxialNbar'], file=file)
+            print("Axial Pi Time =",sCalData['AxialPiTime'], file=file)   
+            print("3DSBC Radial Nbar =",sCalData['RadialAxialNbar'], file=file)
+
+
     IPython.display.clear_output()
     if displayResults:
         assert(len(analysis_names) == len(allFigs))

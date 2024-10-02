@@ -71,7 +71,7 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
                             dataRange=None, guessTemp=10e-6, trackFitCenter=False, picsPerRep=1, startPic=0, binningParams=None, 
                             win=pw.PictureWindow(), transferAnalysisOpts=None, tferBinningParams=None, tferWin= pw.PictureWindow(),
                             extraTferAnalysisArgs={}, emGainSetting=300, lastConditionIsBackGround=True, showTferAnalysisPlots=True,
-                            show2dFitsAndResiduals=True, plotFitAmps=False, indvColorRanges=False, fitF2D=gaussian_2d.f_notheta, 
+                            show2dFitsAndResiduals=True, plotFitAmps=False, indvColorRanges=False, fitF2D=gaussian_2d.f_notheta, plot2dFitsWithImage=True,
                             rmHighCounts=True, useBase=True, weightBackgroundByLoading=True, returnPics=False, returnMeans=False, forceNoAnnotation=False):
     """
     returnPics is false by default in order to conserve memory. The total picture arrays of lots of experiments can take up a lot of RAM and are usually unnecessary,
@@ -247,8 +247,12 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
             
             totalSignal[vari][which] = np.sum(im.flatten())
             keyPlt[vari] = keyV
-            res = mp.fancyImshow(fig, ax, im, imageArgs={'cmap':dark_viridis_cmap, 'vmin':min_, 'vmax':max_}, 
-                                 hFitParams=hparams, vFitParams=vparams, fitModule=fitModule, flipVAx = True, fitParams2D=param2d)
+            if plot2dFitsWithImage == True:
+                res = mp.fancyImshow(fig, ax, im, imageArgs={'cmap':dark_viridis_cmap, 'vmin':min_, 'vmax':max_}, 
+                                     hFitParams=hparams, vFitParams=vparams, fitModule=fitModule, flipVAx = True, fitParams2D=param2d)
+            else:
+                res = mp.fancyImshow(fig, ax, im, imageArgs={'cmap':dark_viridis_cmap, 'vmin':min_, 'vmax':max_}, 
+                         hFitParams=hparams, vFitParams=vparams, fitModule=fitModule, flipVAx=True, fitParams2D=None)
             ax.set_title(keyV + ': ' + str(datalen[keyV]) + ';\n' + title + ': ' + misc.errString(hSigmas[vari][which],hSigmaErrs[vari][which]) 
                 + r'$\mu m$ sigma, ' + misc.round_sig_str(totalSignal[vari][which],5), fontsize=12)            
             if show2dFitsAndResiduals:
@@ -414,15 +418,15 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
         for temp, err, label in zip(temps, tempErrs, ['Hor', 'Vert', 'Hor2D', 'Vert2D']): 
             print(label + ' temperature = ' + misc.errString(temp*1e6, err*1e6) + 'uk')
 
-    for fid in fids:
-        if type(fid) == int:
-            expTitle, _, lev = exp.getAnnotation(fid)
-            expTitle = ''.join('#' for _ in range(lev)) + ' File ' + str(fid) + ': ' + expTitle
-            disp.display(disp.Markdown(expTitle))
-            with exp.ExpFile(fid) as file:
-                file.get_basic_info()
-    if trackFitCenter:
-        pass
+    # for fid in fids:
+    #     if type(fid) == int:
+    #         expTitle, _, lev = exp.getAnnotation(fid)
+    #         expTitle = ''.join('#' for _ in range(lev)) + ' File ' + str(fid) + ': ' + expTitle
+    #         disp.display(disp.Markdown(expTitle))
+    #         with exp.ExpFile(fid) as file:
+    #             file.get_basic_info()
+    # if trackFitCenter:
+        # pass
         #print('Acceleration in Mpix/s^2 = ' + misc.errString(accelFit[1], accelErr[1]))
     if transferAnalysisOpts is not None and showTferAnalysisPlots:
         colors, colors2 = misc.getColors(len(transferAnalysisOpts.initLocs()) + 2)#, cmStr=dataColor)
@@ -450,7 +454,7 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
         mean = meanList
         normalized_mean = (meanList - np.min(meanList)) / (np.max(meanList) - np.min(meanList))
     keyList = [float(num) for num in keyDict]
-    return keyList,normalized_mean,mean
+    return keyList,vfitCenter[:,onlyThisPic],vFitCenterErrs[:,onlyThisPic]
 
 #     return returnDictionary
 

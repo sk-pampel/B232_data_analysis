@@ -441,16 +441,16 @@ def extract_NA_2pinholes(im, numGauss, neighborhood_size=20, threshold=1, direct
     airy_res_2 = im2_airy_norm_2[int(len(im2_airy_2)/2)][0:len(im2_airy_2)]-airy_fit_norm_2[int(len(im2_airy_2)/2)][0:len(im2_airy_2)]
     
     
-    ave_waist_1 = (popt2G_1[3]+popt2G_1[4])/2
-    ave_waist_2 = (popt2G_2[3]+popt2G_2[4])/2
-    print('sigma_x (pinhole 1) = ',round(popt2G_1[4], 5),'um')
-    print('sigma_y (pinhole 1)',round(popt2G_1[3],5),'um')
+    ave_waist_1 = abs((popt2G_1[3]+popt2G_1[4]))/2
+    ave_waist_2 = abs((popt2G_2[3]+popt2G_2[4]))/2
+    print('sigma_x (pinhole 1) = ',round(abs(popt2G_1[4]), 5),'um')
+    print('sigma_y (pinhole 1)',round(abs(popt2G_1[3]),5),'um')
     print('\033[1m' +'average waist (pinhole 1)= '+'\033[0m',round(ave_waist_1,5), 'um')
     print('Airy NA (pinhole 1) =',NA_airy_unc_1)
     print('Gauss NA (pinhole 1) =',NA_gauss_unc_1)
     print('\033[1m' + 'Average NA (pinhole 1) =' +'\033[0m',average_NA_1)
-    print('sigma_x (pinhole 2) = ',round(popt2G_2[4],5),'um')
-    print('sigma_y (pinhole 2)',round(popt2G_2[3],5),'um')
+    print('sigma_x (pinhole 2) = ',round(abs(popt2G_2[4]),5),'um')
+    print('sigma_y (pinhole 2)',round(abs(popt2G_2[3]),5),'um')
     print('\033[1m' +'average waist (pinhole 2)= '+'\033[0m',round(ave_waist_2,5),'um')
     print('Airy NA (pinhole 2) =',NA_airy_unc_2)
     print('Gauss NA (pinhole 2) =',NA_gauss_unc_2)
