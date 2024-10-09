@@ -436,10 +436,21 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
     returnDictionary = {'images':images, 'fits':hFitParams, 'errs':hFitErrs, 'hSigmas':hSigmas, 'sigmaErrors':hSigmaErrs, 'dataKey':keyPlt, 
             'hTotalPhotons':hTotalPhotons, 'tempCalc':temps, 'tempCalcErr':tempErrs, 'initThresholds':initThresholds[0], 
             '2DFit':fitParams2D, '2DErr':fitErrs2D, 'bgPics':picsForBg, 'dataLength':datalen}
+    # if returnPics: 
+    #     returnDictionary['pics'] = sortedStackedPics
+    # return returnDictionary        
+    if onlyThisPic is None:
+        averaged_image = np.mean([img[2] for img in images.values()], axis=0)  # Average the third image in the list for each variation
+    else:
+        averaged_image = np.mean([img[onlyThisPic] for img in images.values()], axis=0)
+
+    # Add the averaged image to the dictionary as 'average_over_variations'
+    returnDictionary['average_over_variations'] = averaged_image
+
     if returnPics: 
         returnDictionary['pics'] = sortedStackedPics
-        
 
+    return returnDictionary
     imageDict = returnDictionary['images']
     meanList = []
     keyDict = []
@@ -455,8 +466,6 @@ def freespaceImageAnalysis( fids, guesses = None, fit=True, bgInput=None, bgPcIn
         normalized_mean = (meanList - np.min(meanList)) / (np.max(meanList) - np.min(meanList))
     keyList = [float(num) for num in keyDict]
     return keyList,vfitCenter[:,onlyThisPic],vFitCenterErrs[:,onlyThisPic]
-
-#     return returnDictionary
 
 def getBgImgs(bgSource, startPic=1, picsPerRep=2, rmHighCounts=True, bgWeights=[], weightBackgrounds=True):
     """ Probably should test with old-fashioned methods, but as of now basically just expects the source to be a 2D array of pictures, i.e. a 4d array.

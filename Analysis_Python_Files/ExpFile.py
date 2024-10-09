@@ -142,14 +142,42 @@ def getStartDatetime(fileID):
 class ExpFile:
     """
     a wrapper around an hdf5 file for easier handling and management.
+    # """
+    # def __init__(self, file_id=None, expFile_version=currentVersion, useBase=True, keyParameter=None):
+    #     """
+    #     if you give the constructor a file_id, it will automatically fill the relevant member variables.
+    #     """
+    #     if expFile_version is None:
+    #         expFile_version = currentVersion
+    #     # copy the current value of the address
+    #     self.version = expFile_version
+    #     self.f = None
+    #     self.key_name = None
+    #     self.key = None 
+    #     self.pics = None
+    #     self.reps = None
+    #     self.exp_start_time = None
+    #     self.exp_start_date = None
+    #     self.exp_stop_time = None
+    #     self.exp_stop_date = None
+    #     self.data_addr = dataAddress
+    #     if file_id is not None:
+    #         self.f = self.open_hdf5(fileID=file_id, useBase=useBase)
+    #         if self.version==1:
+    #             self.key_name, self.key = self.__get_old_key()
+    #         else:
+    #             self.key_name, self.key = self.get_key(keyParameter=keyParameter)
+    #         self.pics = self.get_pics()
+    #         self.reps = self.get_reps()
+    #         self.exp_start_date, self.exp_start_time, self.exp_stop_date, self.exp_stop_time = self.get_experiment_time_and_date()
+    
+class ExpFile:
+    """
+    a wrapper around an hdf5 file for easier handling and management.
     """
     def __init__(self, file_id=None, expFile_version=currentVersion, useBase=True, keyParameter=None):
-        """
-        if you give the constructor a file_id, it will automatically fill the relevant member variables.
-        """
         if expFile_version is None:
             expFile_version = currentVersion
-        # copy the current value of the address
         self.version = expFile_version
         self.f = None
         self.key_name = None
@@ -163,15 +191,15 @@ class ExpFile:
         self.data_addr = dataAddress
         if file_id is not None:
             self.f = self.open_hdf5(fileID=file_id, useBase=useBase)
-            if self.version==1:
+            if self.version == 1:
                 self.key_name, self.key = self.__get_old_key()
             else:
                 self.key_name, self.key = self.get_key(keyParameter=keyParameter)
             self.pics = self.get_pics()
             self.reps = self.get_reps()
             self.exp_start_date, self.exp_start_time, self.exp_stop_date, self.exp_stop_time = self.get_experiment_time_and_date()
-    
-    
+
+        
     def __enter__(self):
         return self
 
@@ -467,4 +495,3 @@ class ExpFile:
         return start_date, start_time, stop_date, stop_time
         #return "","","",""
 
-    

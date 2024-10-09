@@ -142,14 +142,42 @@ def getStartDatetime(fileID):
 class ExpFile:
     """
     a wrapper around an hdf5 file for easier handling and management.
+    # """
+    # def __init__(self, file_id=None, expFile_version=currentVersion, useBase=True, keyParameter=None):
+    #     """
+    #     if you give the constructor a file_id, it will automatically fill the relevant member variables.
+    #     """
+    #     if expFile_version is None:
+    #         expFile_version = currentVersion
+    #     # copy the current value of the address
+    #     self.version = expFile_version
+    #     self.f = None
+    #     self.key_name = None
+    #     self.key = None 
+    #     self.pics = None
+    #     self.reps = None
+    #     self.exp_start_time = None
+    #     self.exp_start_date = None
+    #     self.exp_stop_time = None
+    #     self.exp_stop_date = None
+    #     self.data_addr = dataAddress
+    #     if file_id is not None:
+    #         self.f = self.open_hdf5(fileID=file_id, useBase=useBase)
+    #         if self.version==1:
+    #             self.key_name, self.key = self.__get_old_key()
+    #         else:
+    #             self.key_name, self.key = self.get_key(keyParameter=keyParameter)
+    #         self.pics = self.get_pics()
+    #         self.reps = self.get_reps()
+    #         self.exp_start_date, self.exp_start_time, self.exp_stop_date, self.exp_stop_time = self.get_experiment_time_and_date()
+    
+class ExpFile:
+    """
+    a wrapper around an hdf5 file for easier handling and management.
     """
     def __init__(self, file_id=None, expFile_version=currentVersion, useBase=True, keyParameter=None):
-        """
-        if you give the constructor a file_id, it will automatically fill the relevant member variables.
-        """
         if expFile_version is None:
             expFile_version = currentVersion
-        # copy the current value of the address
         self.version = expFile_version
         self.f = None
         self.key_name = None
@@ -163,15 +191,38 @@ class ExpFile:
         self.data_addr = dataAddress
         if file_id is not None:
             self.f = self.open_hdf5(fileID=file_id, useBase=useBase)
-            if self.version==1:
+            if self.version == 1:
                 self.key_name, self.key = self.__get_old_key()
             else:
                 self.key_name, self.key = self.get_key(keyParameter=keyParameter)
             self.pics = self.get_pics()
             self.reps = self.get_reps()
             self.exp_start_date, self.exp_start_time, self.exp_stop_date, self.exp_stop_time = self.get_experiment_time_and_date()
+
+    def open_hdf5(self, fileID=None, useBase=True, openFlag='r', day=None, month=None, year=None): 
+        if day and month and year:
+            # Format the path using the new date and month
+            path = f"/Volumes/Local_Data_Repository/{year}/{month}/{month} {day}/Raw Data/data_{fileID}.h5"
+        elif useBase:
+            # Use dataAddress if it's already set correctly
+            if not self.data_addr.endswith('/'):
+                self.data_addr += '/'
+            path = f"{self.data_addr}data_{fileID}.h5"
+        else:
+            path = fileID  # Assuming this is an absolute path
     
+        # Debug: Print the final path before trying to open it
+        print(f"Trying to open file at path: {path}")
     
+        try:
+            # Open the HDF5 file at the constructed path
+            file = h5.File(path, openFlag)
+        except OSError as err:
+            raise OSError(f"Failed to open file! file address was '{path}'. OSError: {err}")
+        
+        self.f = file
+        return file
+        
     def __enter__(self):
         return self
 
@@ -186,20 +237,20 @@ class ExpFile:
         if ('Experiment_Notes' not in self.f['Miscellaneous'] or 'Experiment_Title' not in self.f['Miscellaneous']):
             return False
     
-    def open_hdf5(self, fileID=None, useBase=True, openFlag='r'): 
-        if type(fileID) == int:
-            path = self.data_addr + "data_" + str(fileID) + ".h5"
-        elif useBase:
-            # assume a file address itself
-            path = self.data_addr + fileID + ".h5"
-        else:
-            path = fileID
-        try:
-            file = h5.File(path, openFlag)            
-        except OSError as err:
-            raise OSError("Failed to open file! file address was \"" + path + "\". OSError: " + str(err))
-        self.f = file
-        return file
+    # def open_hdf5(self, fileID=None, useBase=True, openFlag='r'): 
+    #     if type(fileID) == int:
+    #         path = self.data_addr + "data_" + str(fileID) + ".h5"
+    #     elif useBase:
+    #         # assume a file address itself
+    #         path = self.data_addr + fileID + ".h5"
+    #     else:
+    #         path = fileID
+    #     try:
+    #         file = h5.File(path, openFlag)            
+    #     except OSError as err:
+    #         raise OSError("Failed to open file! file address was \"" + path + "\". OSError: " + str(err))
+    #     self.f = file
+    #     return file
     
     def get_reps(self):
         # call this one.
@@ -467,4 +518,3 @@ class ExpFile:
         return start_date, start_time, stop_date, stop_time
         #return "","","",""
 
-    

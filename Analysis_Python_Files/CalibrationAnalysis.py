@@ -354,12 +354,11 @@ def getInitCalData():
 
 def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocations=[2,11,1,1,1]):
     allErrs, allFigs = [],[]
-    analysis_names = ["MOT_TEMPERATURE", "RED_PGC_TEMPERATURE","BASIC_SINGLE_ATOMS","BASIC_SINGLE_ATOMS","SINLGE_ATOM_TEMP", "PUSHOUT_TEST","LR_FIELD_TEST","3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY","THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY","3DSBC_TOP_RADIAL_SIDEBAND_RAMAN_SPECTROSCOPY","3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY",
-                     "3DSBC_TOP_BSB_RABI", "THERMAL_AXIAL_RAMAN_SPECTROSCOPY","3DSBC_AXIAL_RAMAN_SPECTROSCOPY","3DSBC_AXIAL_BSB_RABI"]
-    for std_func in [std_MOT_TEMPERATURE, std_RED_PGC_TEMPERATURE,
-                    std_SINGLE_ATOM_LOADING,std_SINGLE_ATOM_SURVIVAL, std_SINGLE_ATOM_TEMP, std_PUSHOUT, std_LR_QUANT_AXIS,std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
-                    std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY,std_3DSBC_RADIAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY, std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY,std_3DSBC_TOP_BSB_RABI, std_THERMAL_AXIAL_RAMAN_SPECTROSCOPY,
-                    std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY,std_3DSBC_AXIAL_BSB_RABI]:
+    analysis_names = ["BASIC_SINGLE_ATOMS","BASIC_SINGLE_ATOMS","SINLGE_ATOM_TEMP", "PUSHOUT_TEST","LR_FIELD_TEST","3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY","THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY","3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY",
+                     "3DSBC_TOP_BSB_RABI", "THERMAL_AXIAL_RAMAN_SPECTROSCOPY","3DSBC_AXIAL_RAMAN_SPECTROSCOPY"]
+    for std_func in [std_SINGLE_ATOM_SURVIVAL,std_SINGLE_ATOM_LOADING, std_SINGLE_ATOM_TEMP, std_PUSHOUT, std_LR_QUANT_AXIS,std_3DSBC_TOP_CARRIER_RAMAN_SPECTROSCOPY,
+                    std_THERMAL_TOP_SIDEBAND_RAMAN_SPECTROSCOPY, std_3DSBC_TOP_SIDEBAND_RAMAN_SPECTROSCOPY,std_3DSBC_TOP_BSB_RABI, std_THERMAL_AXIAL_RAMAN_SPECTROSCOPY,
+                    std_3DSBC_AXIAL_RAMAN_SPECTROSCOPY]:
         try:
             if std_func in [std_MOT_NUMBER, std_MOT_TEMPERATURE, std_RED_PGC_TEMPERATURE]:
                 sCalData, figures = std_func(sCalData)
@@ -375,18 +374,14 @@ def std_analyzeAll(sCalData = getInitCalData(), displayResults=True, atomLocatio
             allErrs.append(error)
         
         with open('dailycal_data.txt','w') as file:
-            print("MOT temp =", sCalData['MOT_Temperature'], file=file)            
-            print("PGC temp =", sCalData['RPGC_Temperature'], file=file)
             print("atom temp =", sCalData['AtomTemp'], file=file)
             print("F=2 Population=", sCalData['Pushout'],file=file)
             print("LR Field Value=", sCalData['LR_Field_peak_Location'],file=file)
             print("Thermal Radial Nbar =",sCalData['ThermalNbar'], file=file)           
-            print("SBC Radial Nbar =",sCalData['RadialNbar'], file=file)
             print("Radial Trap frequency =",sCalData['RadialTrapFreq'], file=file)
             print("Radial Pi Time =",sCalData['RadialPiTime'], file=file)            
             print("Axial Nbar =",sCalData['ThermalAxialNbar'], file=file)
             print("SBC Axial =",sCalData['AxialNbar'], file=file)
-            print("Axial Pi Time =",sCalData['AxialPiTime'], file=file)   
             print("3DSBC Radial Nbar =",sCalData['RadialAxialNbar'], file=file)
 
 

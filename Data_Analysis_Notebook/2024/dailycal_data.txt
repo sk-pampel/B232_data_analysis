@@ -1,13 +1,9 @@
-MOT temp = None
-PGC temp = None
-atom temp = [24.888281250000002, (3.0098155567245923, 2.3828318288878534)]
-F=2 Population= (0.020833333333333332, 0.03641626702118406, 0.013872421562742043)
-LR Field Value= None
-Thermal Radial Nbar = [inf, inf]
-SBC Radial Nbar = [inf, inf]
-Radial Trap frequency = (139.3189106206882, 54353828.23184295)
-Radial Pi Time = None
+atom temp = [20.2078125, (1.986736528889728, 2.2327054620193727)]
+F=2 Population= (0.0, 0.02220174275713771, 0.00045262258833744795)
+LR Field Value= (2.9984327821374577, 0.00017849837147988656)
+Thermal Radial Nbar = [4.988936883324094, 2.467168504644081]
+Radial Trap frequency = (150.0, inf)
+Radial Pi Time = [2.9169668415672487, 0.7156459188221168]
 Axial Nbar = [1.0, inf]
 SBC Axial = [1.0, inf]
-Axial Pi Time = None
-3DSBC Radial Nbar = [4.9521470166507336e-08, 0.49313966442435286]
+3DSBC Radial Nbar = [inf, inf]
